@@ -1,0 +1,19 @@
+title: Special monitor network interfaces via standard MIB using 64 Bit counters
+agents: snmp
+author: Alena Solodiankina <alena.vladimirovna@gmail.com>
+license: GPL 
+distribution: check_mk
+description:
+ This check does exactly the samee as {if64} but has some features:
+ - using ifName instead ifIndex for interface name
+ - not using ifPhysAddress and ifDescr at all
+ - and a main feature: you can choose interfaces by ifName (or ifAlias if you set if_inventory_uses_alias to True) pattern among the same ifType. For example monitor only Po interfaces among all interfaces with ifType equals to 53.
+
+{Note} Before using this check you must patch the if.include file in checks directory with if.include.v1.2.4.patch (tested only for v1.2.4)
+
+[configuration]
+The same as {if64} has but with one new variable:
+if64_snu_porttypes_filter (dictionary): Here you can specify what you want to filter. Syntax is 'ifType': ("tuple with name patterns"). Dictionary key must be a string value (means use quotes). ifType must be present in {if_inventory_porttypes}. Default is
+if64_snu_porttypes_filter = {
+    '53': ('^Po','^Ag','^vcp'),
+ }
