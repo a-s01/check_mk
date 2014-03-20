@@ -1,0 +1,10 @@
+title: Cisco sensors monitoring
+agents: snmp
+author: Alena Solodiankina <alena.vladimirovna@gmail.com>
+license: GPL 
+distribution: check_mk
+description:
+ Check gets all cisco sensors of present in {cisco_sensor_monitored_types} types and monitor them. The thresholds are also fetched from device by snmp.
+
+[configuration]
+cisco_sensor_monitored_types (list): list of monitored sensor types.

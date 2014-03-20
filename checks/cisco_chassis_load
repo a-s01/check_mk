@@ -1,0 +1,84 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2013             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+#
+# author of this check: Alena Solodiankina <alena.vladimirovna@gmail.com>
+
+chassis_load_default_levels = (80, 90)
+
+def inventory_cisco_chassis_load(info):
+    inventory = []
+
+    for chassis, inLoad, outLoad in info:
+        chassis = chassis[0] + '/' + chassis[2]
+        inventory.append((chassis, "chassis_load_default_levels"))
+        
+    return inventory
+
+def check_cisco_chassis_load(item, params, info):
+    warnLevel, critLevel = params;
+    source_item = item[0] + '.' + item[2]
+    ok, warn, crit, unknown = range(4)
+
+    for chassis, inLoad, outLoad in info:
+        if chassis != source_item:
+            continue
+
+        status = ok
+        infostr = ''
+        essense = ['in', 'out']
+        perfdata = []
+
+        for i,thing in enumerate((inLoad, outLoad)):
+            thing = saveint(thing)
+            infostr += "%s: %d%%" % (essense[i], thing)
+
+            if thing >= critLevel:
+                infostr += " (!!) >= %d" % critLevel
+                status = crit
+            elif thing >= warnLevel:
+                infostr += " (!) >= %d" % warnLevel
+                status = warn
+            if i < (len(essense) - 1):
+                infostr += "; "
+            perfdata.append(("%sLoad" % essense[i], thing, warnLevel, critLevel))
+
+        return (status, infostr, perfdata)
+
+    return (unknown, "Unknown - item wasn't found in snmp data") 
+
+check_info["cisco_chassis_load"] = {
+    'check_function':           check_cisco_chassis_load,
+    'inventory_function':       inventory_cisco_chassis_load,
+    'service_description':      'Chassis %s load',
+    'has_perfdata':             True,
+    'snmp_scan_function':       lambda oid: "cisco" in oid(".1.3.6.1.2.1.1.1.0").lower() and \
+                                    oid(".1.3.6.1.4.1.9.9.217.1.3.1.1.6.*") != None,
+    'snmp_info':                ( ".1.3.6.1.4.1.9.9.217.1.3.1.1", [ 
+                                        OID_END,
+                                        6, # load In
+                                        7, # load Out
+                                ]),
+}
