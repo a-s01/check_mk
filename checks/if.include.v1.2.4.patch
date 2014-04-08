@@ -1,57 +1,57 @@
---- /root/backup/if.include.before.patch	2014-03-11 12:25:10.387249012 +0200
-+++ if.include	2014-03-11 15:03:51.287248771 +0200
-@@ -103,7 +103,7 @@
+--- if.include	2014-04-08 14:49:58.379248949 +0300
++++ /root/if.include.orig	2014-04-02 10:21:07.000000000 +0300
+@@ -94,7 +94,7 @@
          return ifIndex
  
  
--def inventory_if_common(info, has_nodeinfo = False):
-+def inventory_if_common(info, has_nodeinfo = False, type_required = False):
-     if has_nodeinfo:
-         length = 21
-     else:
-@@ -174,6 +174,9 @@
+-def inventory_if_common(info, type_required = False):
++def inventory_if_common(info):
+     if len(info) == 0 or len(info[0]) != 20:
+         return []
+ 
+@@ -156,9 +156,6 @@
  
              if ifType in porttypes and ifOperStatus in portstates:
                  params = {}
-+                if type_required:
-+                    params["iftype"] = ifType
-+
+-                if type_required:
+-                    params["iftype"] = ifType
+-
                  if if_inventory_monitor_state:
                      params["state"] = [ifOperStatus]
  
-@@ -200,14 +203,33 @@
+@@ -185,33 +182,14 @@
                  params["speed"] = total_speed
              pre_inventory.append( (group_name, "%r" % params, int(ifIndex)) )
  
--    inventory = []
-+    if type_required:
-+        inventory = {}
-+    else:
-+        inventory = []
-+
-+    import pprint
+-    if type_required:
+-        inventory = {}
+-    else:
+-        inventory = []
+-
+-    import pprint
++    inventory = []
      # Check for duplicate items (e.g. when using Alias as item and the alias is not unique)
      for item, params, index in pre_inventory:
          if item in duplicate:
              new_item = "%s %d" % (item, index)
          else:
              new_item = item
--        inventory.append((new_item, params))
-+
-+        if type_required:
-+            init_params = eval(params)
-+            if init_params.has_key("aggregate"):
-+                ifType = "_agg"
-+            else:
-+                ifType = str(init_params["iftype"])
-+                del init_params["iftype"]
-+
-+            if not inventory.has_key(ifType):
-+                inventory[ifType] = []
-+
-+            inventory[ifType].append((new_item, "%r" % init_params))
-+        else:
-+            inventory.append((new_item, params))
+-
+-        if type_required:
+-            init_params = eval(params)
+-            if init_params.has_key("aggregate"):
+-                ifType = "_agg"
+-            else:
+-                ifType = str(init_params["iftype"])
+-                del init_params["iftype"]
+-
+-            if not inventory.has_key(ifType):
+-                inventory[ifType] = []
+-
+-            inventory[ifType].append((new_item, "%r" % init_params))
+-        else:
+-            inventory.append((new_item, params))
++        inventory.append((new_item, params))
  
      return inventory
  

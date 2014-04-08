@@ -23,10 +23,8 @@
 # License along with GNU Make; see the file  COPYING.  If  not,  write
 # to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
 # Boston, MA 02110-1301 USA.
-#
-# author of this if64 modification: Alena Solodiankina <alena.vladimirovna@gmail.com>
-
 import re
+import pprint
 
 if_inventory_porttypes = [ '6', '32', '53', '62', '117' ]
 if_inventory_uses_description = True
@@ -36,13 +34,13 @@ if64_snu_porttypes_filter = {
 
 def fix_if64_snu_highspeed(info):
     for line in info:
-        if type(line[4]) == str: # not yet converted
-            line[4] = saveint(line[4]) * 1000000
+        if type(line[3]) == str: # not yet converted
+            line[3] = saveint(line[3]) * 1000000
 
 
 def inventory_if64_snu(info):
     # Fix for switches like DLINK, with empty lines in MIB
-    info = [ x for x in info if saveint(x[1]) > 0 ] 
+    info = [ x for x in info if saveint(x[0]) > 0 ] 
     fix_if64_snu_highspeed(info)
 
     # add a null value as ifPhysAddress
@@ -50,7 +48,8 @@ def inventory_if64_snu(info):
         line.append('')
 
     if if64_snu_porttypes_filter:
-        pre_inventory = inventory_if_common(info, has_nodeinfo = True, type_required = True)
+#        pre_inventory = inventory_if_common(info, has_nodeinfo = True, type_required = True)
+        pre_inventory = inventory_if_common(info, type_required = True)
         inventory = []
 
         for ifType in pre_inventory:
@@ -68,16 +67,19 @@ def inventory_if64_snu(info):
                 inventory.extend(pre_inventory[ifType])
         return inventory
     else:
-        return(inventory_if_common(info, has_nodeinfo = True))
+#        return(inventory_if_common(info, has_nodeinfo = True))
+        return(inventory_if_common(info))
 
     return []
 
 def check_if64_snu(item, params, info):
     fix_if64_snu_highspeed(info)
     # add a null value as ifPhysAddress
-    for line in info:
-        line.append('')
-    return check_if_common(item, params, info, has_nodeinfo = True)
+    if len(info[0]) != 20:
+        for line in info:
+            line.append('')
+
+    return check_if_common(item, params, info)
 
 
 def if64_snu_scan_function(oid):
@@ -132,6 +134,5 @@ check_info["if64_snu"] = {
     ]),
     'snmp_scan_function'        : if64_snu_scan_function,
     'group'                     : 'if',
-    'node_info'                 : True,
     'default_levels_variable'   : 'if_default_levels',
 }
