@@ -1,0 +1,43 @@
+--- /root/backup/mail	2014-04-14 12:28:40.207680001 +0300
++++ mail	2014-04-14 16:26:44.215680004 +0300
+@@ -157,7 +157,7 @@
+ Host:     $HOSTNAME$ ($HOSTALIAS$)
+ Address:  $HOSTADDRESS$
+ $HOSTLINK$
+-State:    $LASTHOSTSTATE$ -> $HOSTSTATE$ ($NOTIFICATIONTYPE$) since $LASTHOSTSTATECHANGE_REL$
++State:    $LASTHOSTSTATE$ -> $HOSTSTATE$ ($NOTIFICATIONTYPE$) since $SHORTDATETIME$
+ Output:   $HOSTOUTPUT$
+ Perfdata: $HOSTPERFDATA$
+ $LONGHOSTOUTPUT$
+@@ -184,7 +184,7 @@
+     <td class="state">
+         <span class="hstate$LASTHOSTSTATE$">$LASTHOSTSTATE$</span> &rarr;
+         <span class="hstate$HOSTSTATEID$">$HOSTSTATE$ ($NOTIFICATIONTYPE$)</span>
+-        since $LASTHOSTSTATECHANGE_REL$
++        since $SHORTDATETIME$
+     </td>
+ </tr>
+ <tr class="even0">
+@@ -205,7 +205,7 @@
+ Address:  $HOSTADDRESS$$HOSTLINK$
+ 
+ Service:  $SERVICEDESC$$SERVICELINK$
+-State:    $LASTSERVICESTATE$ -> $SERVICESTATE$ ($NOTIFICATIONTYPE$) since $LASTSERVICESTATECHANGE_REL$
++State:    $LASTSERVICESTATE$ -> $SERVICESTATE$ ($NOTIFICATIONTYPE$) since $SHORTDATETIME$
+ Output:   $SERVICEOUTPUT$
+ Perfdata: $SERVICEPERFDATA$
+ $LONGSERVICEOUTPUT$
+@@ -309,9 +309,11 @@
+ 
+ def fetch_pnp_data(context, params):
+     try:
++        path = '/usr/share/pnp4nagios/html/index.php'
++        php_save_path = "-d session.save_path=/var/lib/check_mk/tmp/php/session"
+         # Autodetect the path in OMD environments
+-        path = "%s/share/pnp4nagios/htdocs/index.php" % context['OMD_ROOT']
+-        php_save_path = "-d session.save_path=%s/tmp/php/session" % context['OMD_ROOT']
++#        path = "%s/share/pnp4nagios/htdocs/index.php" % context['OMD_ROOT']
++#        php_save_path = "-d session.save_path=%s/tmp/php/session" % context['OMD_ROOT']
+     except:
+         # Non-omd environment - use plugin argument 1
+         path = context.get('PARAMETER_1', '')

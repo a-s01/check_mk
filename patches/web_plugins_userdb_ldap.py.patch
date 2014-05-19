@@ -1,0 +1,12 @@
+--- /usr/share/check_mk/web/plugins/userdb/ldap.py	2014-03-25 15:58:54.311248945 +0200
++++ /root/backup/ldap.py	2014-03-25 15:58:30.779248936 +0200
+@@ -323,8 +323,7 @@
+     # Apply configured group ldap filter and only reply with groups
+     # having the current user as member
+     filt = '(&%s(%s=%s))' % (ldap_filter('groups'), ldap_member_attr(),
+-#                             ldap.filter.escape_filter_chars(user_dn))
+-                             ldap.filter.escape_filter_chars(username))
++                             ldap.filter.escape_filter_chars(user_dn))
+     # First get all groups
+     groups_cn = []
+     groups_dn = []
