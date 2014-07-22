@@ -1,0 +1,79 @@
+factory_settings["cisco_ipv6_octets_default_levels"] = None
+unit = 'Bit'
+
+def pre_inventory_octets(info):
+    values,names = info
+    pre_inventory = []
+
+    values = dict(values)
+    for line in names:
+        index, name, alias = line
+        if values.has_key(index):
+            pre_inventory.append((name, values[index], alias))
+#        pre_inventory.append((name, 1, alias))
+   
+    return pre_inventory
+
+def check_cisco_ipv6_octets(item, params, info):
+    ok, warn, crit, unknown = range(4)
+    item_status = unknown
+    infostr = ''
+    info = pre_inventory_octets(info)
+
+    if params:
+        warn_value, crit_value = params
+    perfdata = []
+
+    for this, value, alias in info:
+        if this != item:
+            continue
+
+        if alias:
+            infostr = "%s: " % alias
+
+        try:
+            timedif, rate = get_counter("cisco_ipv6_oct.%s" % item, time.time(), saveint(value))
+        except MKCounterWrapped:
+            raise MKCounterWrapped("", "Counter wrap, skipping checks this time")
+        if unit == "Bit":
+            rate = rate * 8
+            infostr += get_nic_speed_human_readable(rate)
+        else:
+            infostr += "%s/s" % get_bytes_human_readable(rate)
+
+
+        if params:
+            if rate >= crit_value:
+                item_status = crit
+                infostr += ": (!!) >= %d" % crit_value
+            elif rate >= warn_value:
+                item_status = warn
+                infostr += ": (!) >= %d" % warn_value
+            perfdata.append(("octets", rate, warn_value, crit_value))
+        else:
+            item_status = ok
+            perfdata.append(("octets", rate))
+    if infostr is None:    
+        infostr = "Item wasn't found in snmp data"
+    return (item_status, infostr, perfdata)
+
+def inventory_cisco_ipv6_octets(info):
+    inventory = []
+    pre_inventory = pre_inventory_octets(info)
+
+    for item, value, alias in pre_inventory:
+        inventory.append((item, factory_settings["cisco_ipv6_octets_default_levels"]))
+    
+    return inventory
+
+check_info["cisco_ipv6_octets"] = {
+    'check_function':           check_cisco_ipv6_octets,
+    'inventory_function':       inventory_cisco_ipv6_octets,
+    'service_description':      'IPv6 %s octets',
+    'has_perfdata':             True,
+    'snmp_info':                [ (   ".1.3.6.1.2.1.4.31.3.1.33", [ OID_END, "2"]), 
+                                  (  ".1.3.6.1.2.1.31.1.1.1", [ OID_END, "1", "18"]),
+                                ],
+    'snmp_scan_function':       lambda oid: "cisco" in oid(".1.3.6.1.2.1.1.1.0").lower() and \
+                                    oid(".1.3.6.1.2.1.4.31.3.1.33.2.*") != None,
+}
