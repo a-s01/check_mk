@@ -1,0 +1,8 @@
+check_info[] = {
+    'check_function':   ,
+    'inventory_function':   ,
+    'service_description':  ,
+    'has_perfdata':         True,
+    'snmp_scan_function':   ,
+    'snmp_info':            [],
+}
