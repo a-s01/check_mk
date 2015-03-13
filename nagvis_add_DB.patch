@@ -1,0 +1,337 @@
+diff -ruN /root/backup/nagvis/share/server/core/classes/GlobalBackendmklivestatus.php ./share/server/core/classes/GlobalBackendmklivestatus.php
+--- /root/backup/nagvis/share/server/core/classes/GlobalBackendmklivestatus.php	2014-10-16 11:14:52.080002187 +0300
++++ ./share/server/core/classes/GlobalBackendmklivestatus.php	2014-11-07 17:33:16.080000827 +0200
+@@ -1299,6 +1299,23 @@
+     }
+ 
+     /**
++     * PUBLIC returnNameIfHostExists($hostName)
++     *
++     * Queries the livestatus socket if host with host_name exists
++     *
++     * @return host name string if host exists in backend
++     * @author Alena Solodiankina <alena.vladimirovna@gmail.com>
++     *
++     */
++    public function returnNameIfHostExists($hostName) {
++        $newHostName = $this->queryLivestatusSingleRow("GET hosts\nColumns: name\nFilter: host_name = $hostName\nFilter: address = $hostName\nOr: 2\n");
++        if ($newHostName)
++            return $newHostName[0];
++        else
++            return '';
++    }
++
++    /**
+      * PUBLIC getHostNamesWithNoParent()
+      *
+      * Queries the livestatus socket for all hosts without parent
+diff -ruN /root/backup/nagvis/share/server/core/classes/GlobalMainCfg.php ./share/server/core/classes/GlobalMainCfg.php
+--- /root/backup/nagvis/share/server/core/classes/GlobalMainCfg.php	2014-10-16 11:14:52.084002187 +0300
++++ ./share/server/core/classes/GlobalMainCfg.php	2014-10-16 17:12:15.848001966 +0300
+@@ -820,6 +820,15 @@
+                     'editable' => 1,
+                     'default' => '/usr/local/bin/',
+                     'match' => MATCH_STRING_PATH),
++                'link_source' => Array('must' => 0,
++                    'editable' => 1,
++                    'default' => 'nagios',
++                    'match' => MATCH_STRING_NO_SPACE_EMPTY),
++                'use_service_link' => Array('must' => 0,
++                    'editable' => 1,
++                    'default' => '0',
++                    'field_type' => 'boolean',
++                    'match' => MATCH_BOOLEAN),
+                 'showinlists' => Array('must' => 0,
+                     'editable' => 1,
+                     'default' => '1',
+Binary files /root/backup/nagvis/share/server/core/classes/.GlobalMainCfg.php.swp and ./share/server/core/classes/.GlobalMainCfg.php.swp differ
+diff -ruN /root/backup/nagvis/share/server/core/classes/GlobalMapCfg.php ./share/server/core/classes/GlobalMapCfg.php
+--- /root/backup/nagvis/share/server/core/classes/GlobalMapCfg.php	2014-10-16 11:14:52.080002187 +0300
++++ ./share/server/core/classes/GlobalMapCfg.php	2014-11-13 17:30:11.100001837 +0200
+@@ -692,6 +692,7 @@
+         if(isset($params['source_file']))
+             unset($params['source_file']);
+         $param_values = $this->paramsToString($params);
++        $param_values = str_replace("/", "_", $param_values);
+         $cacheFile = cfg('paths','var').'source-'.$this->name.'.cfg-'.$param_values.'-'.CONST_VERSION.'.cache';
+         $CACHE = new GlobalFileCache(array(), $cacheFile);
+ 
+@@ -722,7 +723,6 @@
+                 }
+             }
+         }
+-
+         // Call process filter implicit if not already done
+         process_filter($this, $this->name, $this->mapConfig);
+ 
+diff -ruN /root/backup/nagvis/share/server/core/mapcfg/default.php ./share/server/core/mapcfg/default.php
+--- /root/backup/nagvis/share/server/core/mapcfg/default.php	2014-10-16 11:14:52.080002187 +0300
++++ ./share/server/core/mapcfg/default.php	2014-10-16 17:18:16.136002187 +0300
+@@ -579,6 +579,10 @@
+         'match' => MATCH_STRING_STYLE,
+         'depends_on' => 'label_show',
+         'depends_value' => '1'),
++    'link_source' => Array( #snu
++        'must' => 0,
++        'default' =>  cfg('automap', 'link_source'),
++        'match' => MATCH_STRING_NO_SPACE_EMPTY),
+ 
+     'only_hard_states' => Array(
+         'must' => 0,
+@@ -608,6 +612,11 @@
+         'must' => 0,
+         'default' => cfg('defaults', 'urltarget'),
+         'match' => MATCH_STRING_NO_SPACE),
++    'use_service_link' => Array( #snu
++        'must' => 0,
++        'default'    => cfg('automap', 'use_service_link'),
++        'match'      => MATCH_BOOLEAN,
++        'field_type' => 'boolean'),
+ 
+     'x' => Array(
+         'must' => 1,
+@@ -916,10 +925,12 @@
+     'label_background' => null,
+     'label_border' => null,
+     'label_style' => null,
++    'link_source' => null,
+     'only_hard_states' => null,
+     'recognize_services' => null,
+     'show_in_lists' => null,
+     'show_in_multisite' => null,
++    'use_service_link' => null,
+     'stylesheet' => null,
+     'url_target' => null,
+     'zoom' => null,
+diff -ruN /root/backup/nagvis/share/server/core/sources/automap.php ./share/server/core/sources/automap.php
+--- /root/backup/nagvis/share/server/core/sources/automap.php	2014-10-16 11:14:52.080002187 +0300
++++ ./share/server/core/sources/automap.php	2014-11-13 17:32:13.216001837 +0200
+@@ -17,6 +17,8 @@
+         'overlap',
+         'label_show',
+         'url_target',
++        'link_source',
++        'use_service_link',
+     ),
+ );
+ if (cfg('global', 'shinken_features')) {
+@@ -162,6 +164,37 @@
+ 
+ 
+ 
++/**
++ * Get link connections
++ */
++function getLinkRelations(&$params, $obj, $link_type) {
++    # link_source must return strings in format
++    # obj_port;link_type;remote_obj
++    # link_type equal to downlink and uplink
++    # TODO two sides
++    global $_BACKEND;
++    $return = array();
++
++    if ($_BACKEND->getBackend($params['backend_id'])->returnNameIfHostExists($obj)) {
++	    $command = $params['link_source'] . " $obj $link_type";
++	    exec($command, $linkRelations, $retval);
++	
++	    if ($retval != 0) {
++	        throw new NagVisException(l('externalProgramProblem: ' . $command . ' returned ' . $retval));
++	    } else {
++            foreach ($linkRelations AS $str) {
++                if (0 === strpos($str, 'Error')) {
++                    continue;
++                }
++	            $items = explode(';',$str);
++	            if ($items[1] == $link_type) {
++	                $return[$items[0]] = $items[2];
++	            }
++	        }
++	    }
++    }
++    return ($return);
++}
+ 
+ /**
+  * Get root host object by NagVis configuration or by backend.
+@@ -310,6 +343,7 @@
+     $obj['z']           = 98;
+     $obj['.parents']    = array();
+     $obj['.childs']     = array();
++    $obj['.links']     = array();
+ 
+     return $obj;
+ }
+@@ -319,12 +353,28 @@
+ 
+     $obj = automap_obj_base($MAPCFG, $params, $saved_config, $obj_name);
+ 
+-    $obj['type']       = 'line';
+     $obj['view_type']  = 'line';
+-    $obj['line_type']  = '11';
++    $obj['label_show'] = false;
++    if ($params['use_service_link']) {
++        $obj['type'] = 'service';
++        $service_link = $from_obj['.links'][$to_obj['object_id']];
++        if ($service_link) {
++            $obj['line_type']  = '13';
++            $obj['host_name'] = $from_obj['host_name'];
++            $obj['service_description'] = "Interface $service_link";
++        } else {
++            $obj['type']       = 'line';
++            $obj['line_type']  = '11';
++            $obj['line_width'] = 1;
++            $obj['line_color'] = '#000';
++        }
++    } else {
++        $obj['type']       = 'line';
++        $obj['line_type']  = '11';
++        $obj['line_width'] = 1;
++        $obj['line_color'] = '#000';
++    }
+     $obj['z']          = 90;
+-    $obj['line_color'] = '#000';
+-    $obj['line_width'] = 1;
+     $obj['x']          = $from_obj['object_id'] . '%+' . ($from_obj['.width']  / 2) . ','
+                         .$to_obj['object_id']   . '%+' . ($to_obj['.width']    / 2);
+     $obj['y']          = $from_obj['object_id'] . '%+' . ($from_obj['.height'] / 2) . ','
+@@ -339,24 +389,37 @@
+  */
+ function automap_fetch_tree($dir, $MAPCFG, $params, &$saved_config, $obj_name, $layers_left, &$this_tree_lvl) {
+     // Stop recursion when the number of layers counted down
++
+     if($layers_left != 0) {
+         try {
+             global $_BACKEND;
+             if($dir == 'childs') {
+                 if($obj_name == '<<<monitoring>>>') {
+-                    try {
+-                        $relations = $_BACKEND->getBackend($params['backend_id'])->getHostNamesWithNoParent();
+-                    } catch(BackendConnectionProblem $e) {
+-                        $relations = array();
++                    if ($params['link_source'] == 'nagios') {
++                        try {
++                            $relations = $_BACKEND->getBackend($params['backend_id'])->getHostNamesWithNoParent();
++                        } catch(BackendConnectionProblem $e) {
++                            $relations = array();
++                        }
++                    } else {
++
+                     }
+-                } elseif (cfg('global', 'shinken_features')) {
++                } elseif (cfg('global', 'shinken_features')) { #UNKNOWN
+                     if ($params['min_business_impact']){
+                         $tmp_array = array_flip(list_business_impact());
+                         $min_business_impact = $tmp_array[$params['min_business_impact']];
+                     }
+                     $relations = $_BACKEND->getBackend($params['backend_id'])->getDirectChildDependenciesNamesByHostName($obj_name, $min_business_impact);
+                 } else {
+-                    $relations = $_BACKEND->getBackend($params['backend_id'])->getDirectChildNamesByHostName($obj_name);
++                    if ($params['link_source'] == 'nagios') {
++                        $relations = $_BACKEND->getBackend($params['backend_id'])->getDirectChildNamesByHostName($obj_name);
++                    } else {
++                        try {
++                            $relations = getLinkRelations($params, $obj_name, 'downlink');
++                        } catch(someProblem $e) {
++                            $relations = array();
++                        }
++                    }
+                 }
+             } else {
+                 if (cfg('global', 'shinken_features')) {
+@@ -366,37 +429,44 @@
+                     }
+                     $relations = $_BACKEND->getBackend($params['backend_id'])->getDirectParentDependenciesNamesByHostName($obj_name, $min_business_impact);
+                 } else {
+-                    $relations = $_BACKEND->getBackend($params['backend_id'])->getDirectParentNamesByHostName($obj_name);
++                    if ($params['link_source'] == 'nagios') {
++                        $relations = $_BACKEND->getBackend($params['backend_id'])->getDirectParentNamesByHostName($obj_name);
++                    } else {
++                        try {
++                            $relations = getLinkRelations($params, $obj_name, 'uplink');
++                        } catch(someProblem $e) {
++                            $relations = array();
++                        }
++                    }
+                 }
+             }
+         } catch(BackendException $e) {
+             $relations = array();
+         }
+ 
+-        foreach($relations AS $rel_name) {
++        foreach($relations AS $int => $rel_name) {
+             if (in_array($rel_name, $params['ignore_hosts']) == True){
+                 continue;
+             }
++            $nagios_rel_name = $_BACKEND->getBackend($params['backend_id'])->returnNameIfHostExists($rel_name);
++            if ($nagios_rel_name) {
++                $rel_name = $nagios_rel_name;
++            }
+             $obj = automap_obj($MAPCFG, $params, $saved_config, $rel_name);
+ 
+             // Add to tree
+-            $this_tree_lvl[$obj['object_id']] = $obj;
++            $this_tree_lvl['.'.$dir][$obj['object_id']] = $obj;
++            if ($params['use_service_link']) {
++                $this_tree_lvl['.links'][$obj['object_id']] = $int;
++            }
+ 
+             // < 0 - there is no limit
+             // > 0 - there is a limit but it is no reached yet
+             if($layers_left < 0 || $layers_left > 0) {
+-                automap_fetch_tree($dir, $MAPCFG, $params, $saved_config, $rel_name, $layers_left - 1, $this_tree_lvl[$obj['object_id']]['.'.$dir]);
++                automap_fetch_tree($dir, $MAPCFG, $params, $saved_config, $rel_name, $layers_left - 1, $this_tree_lvl['.'.$dir][$obj['object_id']]);
+             }
+         }
++ #       fclose($F);
+     }
+ }
+ 
+@@ -408,7 +478,7 @@
+     // Initialize the tree with the root objects
+     $tree = &$root_obj;
+ 
+-    automap_fetch_tree('childs', $MAPCFG, $params, $saved_config, $root_name, $params['child_layers'], $root_obj['.childs']);
++    automap_fetch_tree('childs', $MAPCFG, $params, $saved_config, $root_name, $params['child_layers'], $root_obj);
+ 
+     // Get all parent object information from backend when needed
+     // If some parent layers are requested: It should be checked if the used
+@@ -417,7 +487,7 @@
+         global $_BACKEND;
+         
+         if($_BACKEND->checkBackendFeature($params['backend_id'], 'getDirectParentNamesByHostName')) {
+-            automap_fetch_tree('parents', $MAPCFG, $params, $saved_config, $root_name, $params['parent_layers'], $root_obj['.parents']);
++            automap_fetch_tree('parents', $MAPCFG, $params, $saved_config, $root_name, $params['parent_layers'], $root_obj);
+         }
+     }
+ 
+@@ -567,6 +637,7 @@
+         foreach(array_keys($conf) as $key)
+             if($key[0] == '.')
+                 unset($map_config[$object_id][$key]);
++
+ }
+ 
+ function automap_program_start($p) {
+Binary files /root/backup/nagvis/share/server/core/sources/.automap.php.swp and ./share/server/core/sources/.automap.php.swp differ
+diff -ruN /root/backup/nagvis/share/server/core/sources/automap_pos.php ./share/server/core/sources/automap_pos.php
+--- /root/backup/nagvis/share/server/core/sources/automap_pos.php	2014-10-16 11:14:52.080002187 +0300
++++ ./share/server/core/sources/automap_pos.php	2014-11-13 17:33:20.532001837 +0200
+@@ -43,7 +43,7 @@
+ }
+ 
+ function graphviz_config_connector($from_id, $to_id) {
+-    return '    "'.$from_id.'" -- "'.$to_id.'" [ weight=2 ];'."\n";
++    return '    "'.$from_id.'" -- "'.$to_id.'" [ weight=2, len=2.5 ];'."\n";
+ }
+ 
+ function graphviz_config_tree(&$params, &$tree, $layer = 0) {
+@@ -123,7 +123,7 @@
+ 
+     /* Directed (dot) and radial (twopi) only */
+     if($params['render_mode'] == 'directed' || $params['render_mode'] == 'radial') {
+-        $str .= 'ranksep="0.8", ';
++        $str .= 'ranksep="2", ';
+     }
+ 
+     /* All but directed (dot) */
