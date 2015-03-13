@@ -1,0 +1,32 @@
+--- lnx_if	2014-07-04 09:34:52.000000000 +0300
++++ /root/backup/usr/share/check_mk/checks/lnx_if	2014-12-08 15:28:11.752000000 +0200
+@@ -43,6 +43,7 @@
+ #         Duplex: Full
+ #         Auto-negotiation: on
+ #         Link detected: yes
++import re
+ 
+ check_includes['lnx_if'] = [ "if.include" ]
+ 
+@@ -53,6 +54,9 @@
+     current_nic = None
+     index = 0
+     for line in info:
++#        if line[0].startswith('ppp') or line[0].startswith('[ppp') \
++#            or re.match(r'^\[*eth\d+\.\]*',line[0]):
++#            continue
+         if line[0].startswith('['):
+             current_nic = line[0][1:-1]
+             index += 1
+@@ -83,6 +87,11 @@
+         else:
+             ifType = 6
+ 
++        if nic.startswith('ppp'):
++            continue
++        elif re.match(r'^\[*eth\d+\.\]*',nic):
++            continue
++
+         # Compute speed
+         speed_text = attr.get("Speed")
+         if speed_text == None:

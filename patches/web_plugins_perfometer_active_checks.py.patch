@@ -1,0 +1,12 @@
+--- /root/backup/active_checks.py	2014-08-20 13:39:36.258451885 +0300
++++ active_checks.py	2014-08-20 13:38:17.362452001 +0300
+@@ -35,7 +35,8 @@
+ perfometers["check_mk_active-tcp"] = perfometer_check_tcp
+ 
+ def perfometer_check_http(row, check_command, perfdata):
+-    time_ms = float(perfdata[0][1]) * 1000.0
++    thisTime = perfdata[0][1].replace(",",".")
++    time_ms = float(thisTime) * 1000.0
+     return "%.1f ms" % time_ms, \
+         perfometer_logarithmic(time_ms, 1000, 10, "#66ccff")
+ 
