@@ -1,0 +1,42 @@
+factory_settings["dlink_3100_cpu_default_levels"] = (80,90)
+
+def inventory_dlink_3100_cpu(info):
+    return [("cpu", factory_settings["dlink_3100_cpu_default_levels"])]
+    
+def check_dlink_3100_cpu(item, params, info):
+    if info == None:
+        return (unknown, "No snmp data", [])
+    info = info[0]
+    cpu = ("Current","1min","5min")
+    ok, warn, crit, unknown = range(4)
+    warnLevel,critLevel = params
+    state = ok
+    perfdata = []
+    infostr = ''
+    
+    for i in range(3):
+        info[i] = saveint(info[i])
+        if i == 2:
+            if info[i] >= critLevel:
+                state = crit
+                infostr += "%s: %d%% (!!) >= %d" % (cpu[i],info[i],critLevel)
+            elif info[i] >= warnLevel:
+                state = warn
+                infostr += "%s: %d%% (!) >= %d" % (cpu[i],info[i],warnLevel)
+            else:
+                infostr += "%s: %d%%" % (cpu[i],info[i])
+                perfdata.append((cpu[i], info[i], warnLevel, critLevel))
+        else:
+            infostr += "%s: %s%%; " % (cpu[i],info[i])
+            perfdata.append((cpu[i], info[i]))
+    
+    return (state, infostr, perfdata)
+
+check_info["dlink_3100_cpu"] = {
+    'check_function':           check_dlink_3100_cpu,
+    'inventory_function':       inventory_dlink_3100_cpu,
+    'service_description':      'CPU load',
+    'has_perfdata':             True,
+    'snmp_info':                ( ".1.3.6.1.4.1.171.10.94.89.89.1", [ "7.0","8.0","9.0" ]), 
+    'snmp_scan_function':       lambda oid: oid(".1.3.6.1.4.1.171.10.94.89.89.1.7.0") != None,
+}

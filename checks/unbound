@@ -1,0 +1,91 @@
+import re
+#import pickle
+#from os import path
+
+mon_values = { 'rcode' : 'num.answer.rcode.', 'type' : 'num.query.type.', 'time' : 'time.', 'num' : 'total.num.'}
+unbound_full = {   'type' : ['A', 'A6', 'AAAA', 'ANY', 'CNAME', 'DNSKEY', 'DS', 'MX', 'NAPTR', 'NS', 'other', 'PTR', 'SOA', 'SPF', 'SRV', 'TXT', 'TYPE0'],
+                    'rcode' : ['NOERROR', 'NXDOMAIN', 'SERVFAIL', 'REFUSED', 'nodata'],
+}
+
+def inventory_unbound(info):
+    return [(None,None)]
+
+def inventory_unbound_stats(info):
+    inventory = []
+
+    for group in mon_values:
+        if group == 'time':
+            continue
+        inventory.append((group,None))
+
+    return inventory
+
+def parse_unbound(info):
+    dict = {}
+    for s in info:
+        item,value = s[0].split("=")
+        for group, pattern in mon_values.iteritems():
+            if re.match(pattern, item):
+                short_key = item.replace(pattern, '')
+                if not (group in dict):
+                    dict[group] = {short_key : value}
+                else:
+                    dict[group].update({short_key : value})
+    return dict
+
+def check_unbound_state(item, params, info):
+    dict = parse_unbound(info)
+
+    if dict:
+        if dict.has_key('time') and dict['time'].has_key('up'):
+            return (check_uptime_seconds(None, float(dict['time']['up'])))
+        else:
+            return (3, "Server seems to be running, but uptime is unknown.")
+    else:
+        return (2, "Server isn't running")
+ 
+def check_unbound_stats(item, params, info):
+    dict = parse_unbound(info)
+    t = dict['time']['elapsed']
+    ok, warn, crit, unknown = range(4)
+    state = unknown
+    perfdata = []
+    infostr = ''
+
+    if unbound_full.has_key(item):
+        keys = unbound_full[item]
+    else:
+        keys = dict[item]
+
+    for key in keys:
+        if dict[item].has_key(key):
+            value = round(float(dict[item][key])/float(t), 2)
+        else:
+            value = 0
+
+        infostr += "%s: %s, " % (key,value)
+        
+        perfdata.append((key, value))
+        
+    if infostr:
+        state = ok
+        infostr = infostr[:-2]
+        infostr = "Current stats per second: %s" % infostr
+    else:
+        infostr = "No info was found"
+
+    return (state, infostr, perfdata);
+
+check_info["unbound.state"] = {
+    'check_function':       check_unbound_state,
+    'inventory_function':   inventory_unbound,
+    'service_description':  "Unbound state",
+    'has_perfdata':         True,
+}
+
+check_info["unbound.stats"] = {
+    'check_function':   check_unbound_stats,
+    'inventory_function':   inventory_unbound_stats,
+    'service_description':  "Unbound %s stats",
+    'has_perfdata':         True,
+}

@@ -1,0 +1,37 @@
+factory_settings["extreme_fdb_levels"] = (None,None);
+
+def check_extreme_fdb(item,params,info):
+    ok, warn, crit, unknown = range(4)
+    warn_v, crit_v = params
+    status = None
+    infostr = ''
+    
+    total = saveint(info[0][0])
+    infostr = "Total fdb entries: %d" % total
+
+    
+    if crit_v and total >= crit_v:
+        infostr += "(!!) >= %d" % crit_v
+        status = crit
+    elif warn_v and total >= warn_v:
+        status = warn
+        infostr += " (!) >= %d" % warn_v
+    else:
+        status = ok
+    
+    perfdata = [('total', total, warn_v, crit_v)]
+    return (status, infostr, perfdata)
+    
+def inventory_extreme_fdb(info):
+    if info[0][0]:
+        return [(None,factory_settings["extreme_fdb_levels"])]
+    return []
+    
+check_info["extreme.fdb"] = {
+    'check_function':   check_extreme_fdb,
+    'inventory_function':   inventory_extreme_fdb,
+    'service_description':  "FDB info",
+    'has_perfdata':         True,
+    'snmp_scan_function':   lambda oid: oid(".1.5002") != None,
+    'snmp_info':            (".1.5002", ['1']),
+}

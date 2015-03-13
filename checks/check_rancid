@@ -1,0 +1,12 @@
+def inventory_rancid():
+    return []
+
+def check_rancid():
+    return []
+
+check_info['rancid'] = {
+    'check_function':   check_rancid,
+    'inventory_function':   inventory_rancid,
+    'service_description':  "Rancid state",
+    'has_perfdata':         False,
+}

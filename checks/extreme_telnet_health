@@ -1,0 +1,66 @@
+from time import strftime, localtime
+control_period = 600
+snmpwalk_dir = "/var/lib/check_mk/snmpwalks"
+extreme_conf = "/etc/check_mk/conf.d/extreme-telnet.mk"
+extreme_conf_new = "/etc/check_mk/conf.d/extreme-telnet.mk-new"
+extreme_conf_bkp = "/etc/check_mk/conf.d/.extreme-telnet.mk.bkp"
+extreme_telnet_tags = "snmp|stored_snmp|noPing|virtual|extreme"
+
+def check_extreme_telnet_health(item,_no_param,info):
+    global g_hostname
+    ok, crit = (0, 2)
+    status = ok
+    extreme_snmpwalk_file = "%s/%s-telnet" % (snmpwalk_dir, g_hostname)
+    if os.path.exists(extreme_snmpwalk_file):
+        stat = os.stat(extreme_snmpwalk_file)
+        infostr = "Last modified: %s" % strftime("%H:%M:%S %d.%m.%Y",localtime(stat.st_mtime))
+        now = time.time();
+        if stat.st_mtime < (now - control_period):
+            status = crit
+            infostr += "(!!) expired, ttl %ds"  % control_period
+    else:
+        status = crit
+        infostr = "No snmpwalk stored in %s" % snmpwalk_dir
+        
+    return (status, infostr)
+
+def inventory_extreme_telnet_health(info):
+    global g_hostname
+    telnet_name = "%s-telnet" % g_hostname
+
+    if os.path.exists(extreme_conf):
+        content = []
+        f = open(extreme_conf, 'r')
+
+        for line in f:
+            if telnet_name in line:
+                f.close()
+                return [(None,None)]
+
+            if ']' in line:
+                if line == ']\n':
+                    continue
+                else:
+                    line = line[:-1]
+            content.append(line)
+
+        f.close()
+        newF = open(extreme_conf_new, 'w')
+        for line in content:
+            newF.write(line)
+
+        newF.write("\t'%s|%s',\n]" % (telnet_name, extreme_telnet_tags))
+        newF.close()
+        
+        os.rename(extreme_conf, extreme_conf_bkp)
+        os.rename(extreme_conf_new, extreme_conf)
+    return [(None,None)]
+
+check_info["extreme_telnet_health"] = {
+    'check_function':   check_extreme_telnet_health,
+    'inventory_function':   inventory_extreme_telnet_health,
+    'service_description':  "Telnet health",
+    'has_perfdata':         False,
+    'snmp_scan_function':   lambda oid: "Extreme" in oid(".1.3.6.1.2.1.1.1.0"),
+    'snmp_info':            (".1.3.6.1.2.1.1.1", ["0"]),
+}

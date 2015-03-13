@@ -1,0 +1,39 @@
+factory_settings["extreme_arp_levels"] = (500,500);
+def check_extreme_arp(item,params,info):
+    ok, warn, crit, unknown = range(4)
+    warn_v, crit_v = params
+    status = None
+    infostr = ''
+
+    count, max_arp = info[0]
+    count = saveint(count)
+    max_arp = saveint(max_arp)
+    infostr = "Dynamic arp entries: %d" % count
+    warn_v = max_arp - warn_v
+    crit_v = max_arp - crit_v
+    if count >= crit_v:
+        infostr += "(!!) >= %d" % crit_v
+        status = crit
+    elif count >= warn_v:
+        status = warn
+        infostr += " (!) >= %d" % warn_v
+    else:
+        status = ok
+
+    infostr += ", max: %d" % max_arp
+    perfdata = [('count', count, warn_v, crit_v)]
+    return (status, infostr, perfdata)
+
+def inventory_extreme_arp(info):
+    if info[0][0]:
+        return [(None,factory_settings["extreme_arp_levels"])]
+    return []
+
+check_info["extreme_arp"] = {
+    'check_function':   check_extreme_arp,
+    'inventory_function':   inventory_extreme_arp,
+    'service_description':  "ARP info",
+    'has_perfdata':         True,
+    'snmp_scan_function':   lambda oid: oid(".1.5001") != None,
+    'snmp_info':            (".1.5001", ['1', '2']),
+}

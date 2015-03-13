@@ -27,36 +27,36 @@ import re
 
 if_inventory_porttypes = [ '6', '32', '53', '62', '117' ]
 if_inventory_uses_description = True
-if64_snu_porttypes_filter = { 
-        '53': ('^Po','^Ag','^vcp',"^Vl"),
+if64_snutest_porttypes_filter = { 
+        '53': ('^Po','^Ag','^vcp'),
 }
 
-def fix_if64_snu_highspeed(info):
+def fix_if64_snutest_highspeed(info):
     for line in info:
         if type(line[3]) == str: # not yet converted
             line[3] = saveint(line[3]) * 1000000
 
 
-def inventory_if64_snu(info):
+def inventory_if64_snutest(info):
     # Fix for switches like DLINK, with empty lines in MIB
     info = [ x for x in info if saveint(x[0]) > 0 ] 
-    fix_if64_snu_highspeed(info)
+    fix_if64_snutest_highspeed(info)
 
     # add a null value as ifPhysAddress
     for line in info:
         line.append('')
 
-    if if64_snu_porttypes_filter:
+    if if64_snutest_porttypes_filter:
 #        pre_inventory = inventory_if_common(info, has_nodeinfo = True, type_required = True)
-        pre_inventory = inventory_if_common(info, type_required = True)
+        pre_inventory = inventory_if_common_test(info, type_required = True)
         inventory = []
 
         for ifType in pre_inventory:
-            if if64_snu_porttypes_filter.has_key(ifType):
+            if if64_snutest_porttypes_filter.has_key(ifType):
                 passed_filter = []
 
                 for line in pre_inventory[ifType]:
-                    for pattern in if64_snu_porttypes_filter[ifType]:
+                    for pattern in if64_snutest_porttypes_filter[ifType]:
                         if re.match(pattern,line[0]):
                             passed_filter.append(line)
                             break
@@ -67,12 +67,12 @@ def inventory_if64_snu(info):
         return inventory
     else:
 #        return(inventory_if_common(info, has_nodeinfo = True))
-        return(inventory_if_common(info))
+        return(inventory_if_common_test(info))
 
     return []
 
-def check_if64_snu(item, params, info):
-    fix_if64_snu_highspeed(info)
+def check_if64_snutest(item, params, info):
+    fix_if64_snutest_highspeed(info)
     # add a null value as ifPhysAddress
     if len(info[0]) != 20:
         for line in info:
@@ -81,10 +81,10 @@ def check_if64_snu(item, params, info):
 #    a = check_if_common(item, params, info)
 #    pprint.pprint(a)
 #    return a
-    return check_if_common(item, params, info)
+    return check_if_common_test(item, params, info)
 
 
-def if64_snu_scan_function(oid):
+def if64_snutest_scan_function(oid):
 #    return False
 
     ignored_strings = [
@@ -107,12 +107,12 @@ def if64_snu_scan_function(oid):
 
 
 
-check_info["if64_snu"] = {
-    'check_function':          check_if64_snu,
-    'inventory_function':      inventory_if64_snu,
+check_info["if64_snutest"] = {
+    'check_function':          check_if64_snutest,
+    'inventory_function':      inventory_if64_snutest,
     'service_description':     'Interface %s',
     'has_perfdata':            True,
-    'includes':                [ 'if.include', ],
+    'includes':                [ 'iftest.include' ],
     'snmp_info':               ( ".1.3.6.1.2.1", [
         "2.2.1.1",     # ifIndex                   0
         "31.1.1.1.1",  # ifName                    1    # replacement for ifDescr 
@@ -134,7 +134,7 @@ check_info["if64_snu"] = {
         "2.2.1.21",    # ifOutQLen                17
         "31.1.1.1.18", # ifAlias                  18
     ]),
-    'snmp_scan_function'        : if64_snu_scan_function,
+    'snmp_scan_function'        : if64_snutest_scan_function,
     'group'                     : 'if',
     'default_levels_variable'   : 'if_default_levels',
 }

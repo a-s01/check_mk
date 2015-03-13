@@ -1,0 +1,17 @@
+def inventory_pppoe_sessions(checkname,info):
+    if info[0][0]:
+        return [(None,None)]
+
+def check_pppoe_sessions(item, params, info):
+    sessions = info[0][0]
+    if sessions:
+        return (0, sessions, [('sessions',sessions)])
+
+    return (3, "No sessions")
+
+check_info["pppoe_sessions"] = { 
+    'check_function':   check_pppoe_sessions,
+    'inventory_function':   inventory_pppoe_sessions,
+    'service_description':  "PPPoEd sessions",
+    'has_perfdata':         True,
+}

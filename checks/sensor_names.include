@@ -1,0 +1,4 @@
+arduina_sensor_names = {
+#    "null" : {},
+    "172.20.92.150": { '1': "Best sensor", '2': "Cool sensor", },
+}

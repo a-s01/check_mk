@@ -1,0 +1,6 @@
+if_groups = [
+    ([{"name" : "Te1/%4"}], ['br1-co-ch2a']),
+    ([{"name" : "Te2/%4"}], ['br1-co-ch2a']),
+    ([{"name" : "Te3/%4"}], ['br1-co-ch2a']),
+    ([{"name" : "Te6/%4"}], ['br1-co-ch2a']),    
+];

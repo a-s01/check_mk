@@ -1,0 +1,15 @@
+def inventory_pppoed_status(checkname,info):
+    if info[0][0] != 'Error':
+        return [(None,None)]
+def check_pppoed_status(item, params, info):
+    info = " ".join(info[0])
+    if info[0][0] != 'Error':
+        return (0, info)
+
+    return (3, info)
+
+check_info["pppoed_status"] = {
+    'check_function':   check_pppoed_status,
+    'inventory_function':   inventory_pppoed_status,
+    'service_description':  "PPPoEd status",
+}

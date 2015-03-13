@@ -1,0 +1,80 @@
+import re
+#extreme_sensor_defaults = { 'rx' : { 'low': (2,3) } }
+sensor_type = {
+                '0': 'temp',
+                '1': 'tx',
+                '2': 'rx',
+                '3': 'tx current',
+                '4': 'voltage1',
+                '5': 'voltage2',
+}
+sensor_units = {
+                'temp': 'C',
+                'tx': 'dBm',
+                'rx': 'dBm',
+                'tx current': 'mA',
+                'voltage1': 'V',
+                'voltage2': 'V',
+}
+def check_extreme_optic(item,params,info):
+    ok, warn, crit, unknown = range(4)
+    status = None
+    infostr = ''
+    perfdata = []
+
+    for port,sensor,value in pre_inventory_extreme_optic(info):
+        if port != item:
+            continue
+
+        if value == 'N/A':
+            continue
+
+        infostr += "%s: " % sensor
+        if '*' in value:
+            status = max(status, warn)
+            value = value[:-1]
+            infostr += "%s (!)" % value
+        else:
+            infostr += "%s" % value
+            status = max(status, ok)
+
+        infostr += "%s; " % sensor_units[sensor]
+        perfdata.append(("%s-%s" % (sensor,sensor_units[sensor]), value))
+
+    if status == None:
+        status = unknown
+        infostr = 'UNKNOWN - sensor info not found in SNMP data'
+            
+    return (status, infostr, perfdata)
+
+def pre_inventory_extreme_optic(info):
+    pre_inventory = []
+    for item in info:
+        k,value = item
+        k = k.split(".")
+        if len(k) == 3:
+            port = "%s:%s" % (k[0],k[1])
+            type = k[2]
+        else:
+            port, type = k
+
+        pre_inventory.append((port,sensor_type[type],value))
+
+    return pre_inventory
+
+def inventory_extreme_optic(info):
+    inventory = []
+    for port,sensor,value in pre_inventory_extreme_optic(info):
+        if sensor == 'temp':
+            inventory.append((port, None))
+
+    return inventory
+
+check_info["extreme_optic"] = {
+    'check_function':   check_extreme_optic,
+    'inventory_function':   inventory_extreme_optic,
+    'service_description':  "Optic info for %s",
+    'has_perfdata':         True,
+    'snmp_scan_function':   lambda oid: oid(".1.5000.1.*") != None,
+    'snmp_info':            (".1", [OID_END, "5000.1"]),
+}

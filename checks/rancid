@@ -1,3 +1,4 @@
+# for correct work add nagios user to rancid group
 from time import localtime, strftime
 from os import path
 
@@ -6,24 +7,31 @@ rancid_dir = '/var/lib/rancid'
 rancid_db = 'router.db'
 rancid_info = { # vendor : { model : (dir, command) }}
     'cisco' : { '7600' : ('cisco-routers', 'cisco'), 'all' : ('cisco-switches', 'cisco')},
-    'dlink' : { '3610' : ('dlink-3610', 'dlink-3610') },
+    'dlink' : { '3610' : ('dlink-3610', 'dlink-3610'), 'all': ('dlink', 'dlink') },
     'extreme' : {'all' : ('extreme', 'extreme')},
     'huawei' : { 'all' : ('huawei-olt', 'hw')},
     'nexus' : { 'all' : ('nexus', 'cisco-nx')},
     'juniper' : { 'all' : ('junipers', 'juniper')},
 }
 
-def check_rancid(item, _no_params, info):
+def check_rancid(item, params, info):
+    global g_hostname
     ok, crit = (0, 2)
     status = crit
     infostr = ''
-    dir, command, item = rancid_vendor(info, item)
+    dir = params['dir']
+    item = g_hostname
+
+    if not re.match(r'(\d{1,3}\.){3}\d{1,3}',item):
+        if not item.endswith('.te.net.ua'):
+            item += ".te.net.ua"
+#    dir, command, item = rancid_vendor(info, item)
     if dir:
         file = "%s/%s/configs/%s" % (rancid_dir,dir,item)
 
         if os.path.exists(file):
             stat = os.stat(file)
-            infostr += "Size: %sB" % stat.st_size
+            infostr += "http://icinga.te.net.ua/cgi-bin/cvsweb/%s/configs/%s Config size: %sB" % (dir, item, stat.st_size)
             if not stat.st_size:
                 infostr += " (!!)"
             else:
@@ -50,8 +58,9 @@ def rancid_vendor(info, item):
     if not item:
         item = g_hostname
 
-    if not item.endswith('.te.net.ua'):
-        item += ".te.net.ua"
+    if not re.match(r'(\d{1-3}\.){3}\d{1-3}',item):
+        if not item.endswith('.te.net.ua'):
+            item += ".te.net.ua"
 
     if vendors_oid.has_key(info):
         vendor, model = vendors_oid[info]
@@ -63,7 +72,7 @@ def rancid_vendor(info, item):
        dir, c = rancid_info[vendor][model] \
             if rancid_info[vendor].has_key(model) else rancid_info[vendor]['all']
        return (dir, c, item)
-    return None
+    return (None, None, None)
 
 def inventory_rancid(info):
     inventory = [];
@@ -85,10 +94,11 @@ def inventory_rancid(info):
                 f.write("%s:%s:up\n" % (item, c))
             
             f.close
-            inventory.append((None, None))    
+            inventory.append((None, { 'dir': dir}))    
         else:
             raise MKGeneralException("Rancid db file (%s) wasn't found" % file)
 
+#    pprint.pprint(inventory)
     return inventory
 
 check_info['rancid'] = {

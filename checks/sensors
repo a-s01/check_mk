@@ -1,0 +1,82 @@
+import re
+
+sensors_levels = {
+    '-H$': (25,35),
+    '-C$': (15,27),
+}
+
+def pre_inventory_sensors(info):
+    pre_inventory = []
+    info = info[0]
+    i=0
+
+    for value in info:
+        if i % 2 == 0:
+            item = value    
+        else:
+            pre_inventory.append((item, value))
+        i += 1
+                   
+    return pre_inventory
+
+def inventory_sensors(info):
+    pre_inventory = pre_inventory_sensors(info)
+    levels = None
+    inventory = []
+
+    for item, value in pre_inventory:
+        for pattern in sensors_levels:
+            if re.search(pattern,item):
+                levels = sensors_levels[pattern]
+                break
+        inventory.append((item, levels));
+        levels = None
+
+    return inventory
+
+def check_sensors(item,params,info):
+    info = pre_inventory_sensors(info)
+    ok, warn, crit, unknown = range(4)
+    status = unknown
+    perfdata = []
+    infostr = "Item not found"
+
+    for this, value in info:
+        if this != item:
+            continue
+        
+        infostr = "temp: %s" % value
+        status = ok
+        if params:
+            crit_min, crit_max = params
+            value = saveint(value)
+            if value < crit_min:
+                infostr += "(!!) < %d" % crit_min
+                status = crit
+            elif value > crit_max:
+                infostr += "(!!) > %d" % crit_max
+                status = crit
+            perfdata.append(("temp", value, crit_min, crit_max))                
+        else:
+            perfdata.append(("temp", value))                             
+        
+    return (status, infostr, perfdata)
+
+check_info['sensors'] = {
+    'check_function':   check_sensors,
+#    'inventory_function':   inventory_sensors,
+    'service_description':  'Sensor %s info',
+    'has_perfdata':         True,
+    'snmp_scan_function':   lambda oid: oid(".1.3.6.1.4.1.25728.50.8.*") != None,
+    'snmp_info':            (".1.3.6.1.4.1.25728.50.8", 
+                                ( 1011, 1005,
+                                  1023, 1017,
+                                  1035, 1029,
+                                  1047, 1041,
+                                  1059, 1053,
+                                   1071, 1065,
+                                   1083, 1077,
+                                   1095, 1089,
+                                ),
+                            )
+}

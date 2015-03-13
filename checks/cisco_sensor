@@ -45,7 +45,7 @@ sensor_scale = {
 	        '5': 'p', #pico
 	        '6': 'n', #nano
 	        '7': 'micro',
-	        '8': 0.01, #milli
+	        '8': 'm', #milli
 	        '10': 'k', #kilo
 	        '11': 'M', #mega
 	        '12': 'G', #giga
@@ -55,9 +55,31 @@ sensor_scale = {
 	        '16': 'Z', #zetta
 	        '17': 'Y', #yotta
 }
-cisco_sensor_monitored_types = ["3", "4", "5", "6", "8", "14"]
 
-def check_cisco_sensor(item, _no_params, info):
+cisco_sensor_monitored_types = ["3", "4", "5", "6", "8", "14"]
+use_cisco_thresholds = False # dirty performance hack: if you'll use cisco thresholds uncomment threshold oid in the end of file
+cisco_sensor_defaults = { 'receive power': { 'low': (2,3) , 'high': (3,4) },
+}
+
+def value_conversion(value, scale, precision):
+    if value == None:
+        return value
+
+    if scale:
+        if isinstance(scale, float):
+            value = float(value)*scale
+        elif isinstance(scale, int):
+            value = value*scale
+
+    if precision:
+        if isinstance(precision, float):
+            value = float(value)*precision
+        else:
+            value = value*precision
+
+    return value
+
+def check_cisco_sensor(item, params, info):
     pre_inventory = parse_entity_info(info)
     ok, warn, crit, unknown = range(4)
 
@@ -65,40 +87,52 @@ def check_cisco_sensor(item, _no_params, info):
     item_status = ok
     perfdata = []
 
-    for container, sensor, state, sensor_type, scale, value, thresholds in pre_inventory:
-#        print "%s, %s, %s, %s, %s, %s" % (item, sensor, state, sensor_type, scale, value)
-#        pprint.pprint(container)
-
+    for container, sensor, state, sensor_type, scale, precision, value, thresholds in pre_inventory:
         if container != item:
             continue
 
         infostr += "%s" % sensor
         if state != '1':
             item_status = crit
-            value = { '2': "unavaliable", '3': "nonoperational" }
+            value = { '2': "unavailable", '3': "nonoperational" }
             infostr += ": %s;" % value[state]
             continue
 
-
-        value = saveint(value)
+        if precision:
+            precision = 10**(-saveint(precision))
+        
         units = ''
-        perfdata_name = sensor.replace(" ", "_")
+        if sensor_scale.has_key(scale):
+            scale = sensor_scale[scale]
+            if not isinstance(scale, (float, int)):
+                units += "%s" % scale
+        else:
+            scale = None
+        value = value_conversion(saveint(value), scale, precision)
+
+        if params != None and params.has_key(sensor) and not use_cisco_thresholds:
+            standart = value_conversion(saveint(params.get(sensor)),scale,precision)
+            newThresh = cisco_sensor_defaults.get(sensor)
+            thresholds = []
+            for key in newThresh:
+                for v in newThresh[key]:
+                    if key == 'high':
+                        thresholds.append(standart + v)
+                    if key == 'low':
+                        if thresholds == None:
+                            thresholds = [ None, None]
+                        thresholds.append(standart - v)
+
+        else:
+            if thresholds != None:
+                for i,v in enumerate(thresholds):
+                    thresholds[i] = value_conversion(v,scale,precision)
+
+#        perfdata_name = sensor.replace(" ", "_")
+        perfdata_name = sensor
 
         if sensor_types.has_key(sensor_type):
-            if sensor_scale.has_key(scale):
-                if isinstance(sensor_scale[scale], (float, int)):
-                    value = float(value)*sensor_scale[scale]
-                    for i,v in enumerate(thresholds):
-                        thresholds[i] = float(v)*sensor_scale[scale]
-                else:
-                    units += "%s" % sensor_scale[scale]
-            if sensor_types[sensor_type] == 'dBm':
-                value = float(value)*0.1
-                for i,v in enumerate(thresholds):
-                    thresholds[i] = float(v)*0.1
-            
             units +="%s" % sensor_types[sensor_type]
-#            infostr += "%s" % units
             perfdata_name += "-%s" % units
        
         if (isinstance(value, float)):
@@ -149,16 +183,19 @@ def check_cisco_sensor(item, _no_params, info):
 def parse_entity_info(info):
     pre_inventory = []
     names = {}
-    thresholds = {}
-    sensor_info,name_info,threshold_info = info
+    if use_cisco_thresholds:
+        thresholds = {}
+        sensor_info,name_info,threshold_info = info
+
+        for endoid, level in threshold_info:
+            id, subid = endoid.split('.')
+            thresholds.setdefault(id, []).append(saveint(level))
+    else:
+        sensor_info,name_info = info
 
     names = dict(name_info)
-    for endoid, level in threshold_info:
-        id, subid = endoid.split('.')
-        thresholds.setdefault(id, []).append(saveint(level))
-   
     for line in sensor_info:
-        id, type, scale, value, state = line
+        id, type, scale, precision, value, state = line
 
         if type not in cisco_sensor_monitored_types \
             or names[id] == '':
@@ -174,15 +211,42 @@ def parse_entity_info(info):
             sensor_names.pop(-1)
         sensor_name = " ".join(sensor_names).lower()
 
-        pre_inventory.append((item, sensor_name, state, type, scale, value, thresholds.get(id, None)))
-   
+        if use_cisco_thresholds:
+            pre_inventory.append((item, sensor_name, state, type, scale, precision, value, thresholds.get(id, None)))
+        else:
+            pre_inventory.append((item, sensor_name, state, type, scale, precision, value, None))
+            
     return pre_inventory
 
 def inventory_cisco_sensor(info):
     pre_inventory = parse_entity_info(info)
+    items = []
+    item_params = {}
+    inventory = []
 
-    return [ (entry[0], None) for entry
+    if use_cisco_thresholds:
+        return [ (entry[0], None) for entry
             in pre_inventory if entry[2] == '1' ]
+ 
+    for entry  in pre_inventory:
+        item, sensor_name, state = entry[:3]
+        value = entry[6]
+        if state == '1':
+            if cisco_sensor_defaults.get(sensor_name):
+                if not item_params.has_key(item):
+                    item_params[item] = {}
+                item_params[item].update({sensor_name: value})
+            
+            if item not in items:
+                items.append(item)
+
+    for item in items:
+        if item_params.has_key(item):
+            inventory.append((item, item_params[item]))
+        else:
+            inventory.append((item,None))
+
+    return inventory
 
 check_info["cisco_sensor"] = {
     'check_function':           check_cisco_sensor,
@@ -195,19 +259,19 @@ check_info["cisco_sensor"] = {
                                         OID_END,
                                         "1", # Type
                                         "2", # Sensor scale
+                                        "3", # Sensor precision
                                         "4", # Most recent measurement
                                         "5", # Status of the sensor 1 == ok, 2 == cannot report, 3 == broken
                                     ]),
                                   ( ".1.3.6.1.2.1.47.1.1.1.1", [ 
                                         OID_END, 
-#                                        "4", # container id
                                         "7", # entPhysicalName
                                     ]),
-                                  ( ".1.3.6.1.4.1.9.9.91.1.2.1.1", [
-                                      OID_END,
-                                      4, # Thresholds
-                                    ]),
+#### Uncomment this if you want use cisco built-in thresholds ###
+#                                  ( ".1.3.6.1.4.1.9.9.91.1.2.1.1", [
+#                                      OID_END,
+#                                      4, # Thresholds
+#                                    ]),
+### end ###
                                 ],
-#    'group':                    'optic_info',
-#    'default_levels_variable':  'optic_default_levels',
 }

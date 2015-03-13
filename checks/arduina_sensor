@@ -1,0 +1,55 @@
+arduina_sensor_names = { 
+#    "172.20.92.150": { '1': "Best sensor", '2': "Cool sensor", },
+}
+
+arduina_sensor_levels = (30,35)
+
+def preInventory_arduina_sensor(info):
+    global g_hostname
+    preInventory = []
+    for line in info:
+        if line[0] == 'Sensor':
+            if g_hostname in arduina_sensor_names and line[1] in arduina_sensor_names[g_hostname]:
+                preInventory.append((arduina_sensor_names[g_hostname][line[1]],line[3]))
+            else:
+                preInventory.append(("Sensor %s" % line[1],line[3]))
+
+    return preInventory
+
+def inventory_arduina_sensor(info):
+    return [ (line[0], arduina_sensor_levels) for line in preInventory_arduina_sensor(info)]
+
+def check_arduina_sensor(item, params, info):
+    info = preInventory_arduina_sensor(info)
+    ok, warn, crit, unknown = range(4)
+    warn_value, crit_value = params
+    
+    for sensor,value in info:
+        if sensor != item:
+            continue
+
+        infostr = "%sC" % value
+        value = float(value)
+        if value >= crit_value:
+            status = crit
+            infostr += " (!!) >= %d" % crit_value
+        elif value >= warn_value:
+            status = warn
+            infostr += " (!) >= %d" % warn_value
+
+        else:
+            status = ok
+
+        if params:
+            perfdata = [('temp', value, warn_value, crit_value)]
+        else:
+            perfdata = [('temp', value)]
+        return (status, infostr, perfdata)
+    return (unknown, "No such sensor was found")
+
+check_info['arduina_sensor'] = {
+    'check_function':   check_arduina_sensor,
+    'inventory_function':   inventory_arduina_sensor,
+    'service_description':  "%s temp",
+    'has_perfdata':         True,
+}
