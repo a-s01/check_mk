@@ -1,0 +1,47 @@
+--- kernel	2015-03-30 12:30:43.524000000 +0300
++++ /usr/share/check_mk/checks/kernel	2015-03-30 15:49:30.136000000 +0300
+@@ -75,9 +75,12 @@
+ kernel_util_default_levels = None
+ 
+ def inventory_cpu_utilization(info):
++    inventory = []
+     for x in info:
+-        if len(x) > 0 and x[0] == 'cpu':
+-            return [(None, "kernel_util_default_levels")]
++        if len(x) > 0 and x[0].startswith('cpu'):
++            inventory.append((x[0], "kernel_util_default_levels"))
++
++    return inventory
+ 
+ # Columns of cpu usage /proc/stat:
+ # - cpuX: number of CPU or only 'cpu' for aggregation
+@@ -91,8 +94,8 @@
+ # - steal: involuntary wait
+ def kernel_check_cpu_utilization(item, params, info):
+     global g_counters
+-    # Look for entry beginning with "cpu"
+-    f = [ l for l in info if l[0] == "cpu" ]
++    # Look for item entry 
++    f = [ l for l in info if l[0] == item ]
+     if len(f) != 1:
+         return (3, "invalid output from plugin")
+     line = f[0]
+@@ -108,7 +111,7 @@
+     n = 0
+     for v in values:
+         n += 1
+-        countername = "cpu.util.%d" % n
++        countername = "%s.util.%d" % (item,n)
+         last_time, last_val = g_counters.get(countername, (0, 0))
+         diff_values.append(v - last_val)
+         g_counters[countername] = (this_time, v)
+@@ -117,8 +120,8 @@
+     if sum_jiffies == 0:
+         return (0, "too short interval")
+     user        = diff_values[0] + diff_values[1] # add user + nice
+-    system      = diff_values[2]
+     wait        = diff_values[4]
++    system      = sum(diff_values[0:7]) - diff_values[3] - wait
+     user_perc   = 100.0 * float(user)   / float(sum_jiffies)
+     system_perc = 100.0 * float(system) / float(sum_jiffies)
+     wait_perc   = 100.0 * float(wait)   / float(sum_jiffies)
