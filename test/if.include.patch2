@@ -1,0 +1,67 @@
+--- /root/backup/if.include	2014-08-07 13:31:55.114452001 +0300
++++ /usr/share/check_mk/checks/if.include	2014-08-07 13:31:21.310452001 +0300
+@@ -37,6 +37,7 @@
+ 
+ factory_settings["if_default_levels"] = {
+     "errors" : (0.01, 0.1),
++    "traffic_excess_period" : (0, 0), #in minutes
+ }
+ 
+ 
+@@ -323,6 +324,7 @@
+     return check_if_common_single(item, params,info)
+ 
+ def check_if_common_single(item, params, info, force_counter_wrap = False):
++    global g_counters
+     # Params now must be a dict. Some keys might
+     # be set to None
+     targetspeed        = params.get("speed")
+@@ -332,6 +334,7 @@
+     average            = params.get("average")
+     unit               = params.get("unit") in ["Bit", "bit"] and "Bit" or "B"
+     unit_multiplier    = unit == "Bit" and 8.0 or 1.0
++    tr_excess_period_warn, tr_excess_perion_crit = params["traffic_excess_period"]
+ 
+     # error checking might be turned off
+     if params["errors"]:
+@@ -538,13 +541,36 @@
+                         perfdata.append( ("%s_avg_%d" % (what, average), traffic_avg, bw_warn, bw_crit, 0, speed) )
+                         traffic = traffic_avg # apply levels to average traffic
+ 
++                    def check_tr_excess_event(excess_count, countername, old_state, new_state, infotext, new_infotext):
++                        if excess_count:
++                            if not countername in g_counters:
++                                g_counters[countername] = (this_time, 1)
++                            else:
++                                last_time, last_val = g_counters.get(countername)
++                                g_counters[countername] = (last_time, last_val + 1)
++
++                                excess_period = (this_time - last_time) / 360
++                                if excess_period > excess_count:
++                                    infotext += new_infotext + " (for last %.1f m)" % excess_period
++                                    return (new_state, infotext)
++                        else:
++                            return (new_state, infotext + new_infotext)
++
++                        return (old_state, infotext)
++                        
+                     # Check bandwidth thresholds
++                    countername_base = "if.%s.%s" % (what, ifAlias)
+                     if bw_crit != None and traffic >= bw_crit:
+-                        state = 2
+-                        infotext += ' (!!) >= ' + format_value(bw_crit)
++                        state, infotext = check_tr_excess_event(tr_excess_period_crit, "%s.%s" % (countername_base, "crit"), state, 2, infotext, ' (!!) >= ' + format_value(bw_crit))
++
+                     elif bw_warn != None and traffic >= bw_warn:
+-                        state = max(state, 1)
+-                        infotext += ' (!) >= ' + format_value(bw_warn)
++                            state, infotext = check_tr_excess_event(tr_excess_period_warn, "%s.%s" % (countername_base, "warn"), state, max(state,1), infotext, ' (!) >= ' + format_value(bw_warn))
++
++                    else:
++                        for tail in ("crit", "warn"):
++                            this_countername = "%s.%s" % (countername_base, tail)
++                            if this_countername in g_counters:
++                                del g_counters[this_countername]
+ 
+                     pacrate = okrate + errorrate
+                     if pacrate > 0.0: # any packets transmitted?
