@@ -1,0 +1,79 @@
+#example of value_names = [ 'transmit power', 'receive power', 'temp', 'voltage', 'current' ]
+#example of precision_table = [ 0.01, 0.01, 1, 0.01, 0.01 ]
+#example of alarm = { 'transmit power' : (-2, -3, 'low'), 'receive power': (-2, -3, 'low') }
+optic_value_units = { "transmit power": "dBm", "receive power": "dBm", "current": "mA", 'voltage': 'V', 'temp': 'C' }
+
+def parse_switch_optic(info, value_names, precision_table, none_value):
+    optic, ifName = info
+    
+    ifName = dict(ifName)
+    parsed = {}
+    
+    for line in optic:
+        if none_value:
+            none_count = sum(map (lambda x: 1 if x == none_value else 0, line[1:]))
+            if none_count == len(line[1:]):
+                continue
+
+        int = ifName[line[0]]
+        parsed[int] = {}
+
+        map (lambda n,v,pre: parsed[int].update({n: saveint(v)*pre if saveint(v) != none_value else None}), \
+            value_names, line[1:], precision_table)
+    
+    return parsed
+
+def inventory_switch_optic(parsed, alarm):
+    inventory = []
+
+    for name in parsed.keys():
+        params = {}
+        for key in alarm.keys():
+            if parsed[name].has_key(key):
+                params.update({key: parsed[name][key]})
+
+        if params:
+            inventory.append((name, params))
+        else:
+            inventory.append((name, None))
+             
+    return inventory
+
+def check_switch_optic(item, params, parsed, alarm):
+    ok, warn, crit, unknown = range(4)
+    perfdata = []
+    status = ok
+    infostr = ""
+
+    if not parsed.has_key(item):
+        return (unknown, "No information about it", perfdata)
+
+    for key in sorted(parsed[item]):
+        value = parsed[item][key]
+        infostr += "%s: %.2f%s" % (key, value, optic_value_units[key])
+
+        if params and params.has_key(key):
+            warnV, critV, type = alarm[key]
+            warnV, critV = params[key] + warnV, params[key] + critV
+            if type == 'low':
+                if value <= critV:
+                    infostr += " (!!) (<= %.2f)" % critV
+                    status = max(crit,status)
+                elif value <= warnV:
+                    infost += " (!) (<= %.2f)" % warnV
+                    status = max(warn,status)
+            else:
+                if value >= critV:
+                    infostr += " (!!) (>= %.2f)" % critV
+                    status = max(crit,status)
+                elif value >= warnV:
+                    infost += " (!) (>= %.2f)" % warnV
+                    status = max(warn,status)
+            perfdata.append((key, value, warnV, critV))
+ 
+        else:
+            perfdata.append((key, value))
+
+        infostr += "; "
+                    
+    return (status, infostr, perfdata)
