@@ -1,0 +1,40 @@
+--- .smart	2015-07-03 15:00:04.128000000 +0300
++++ smart	2015-07-03 15:55:58.292000000 +0300
+@@ -56,6 +56,7 @@
+    'e2e_errs':        (1,  1),
+    'uncorr_errs':     (1,  1),
+    'udma_crcs':       (1,  1),
++   'media_wearout':   (40, 20),
+ }
+ 
+ def parse_smart(info):
+@@ -70,7 +71,10 @@
+                 disks[disk_name] = disk
+ 
+             field = line[4]
+-            if field != "Unknown_Attribute":
++            if field == 'Media_Wearout_Indicator':
++                value = saveint(line[6])
++                disk[field] = value
++            elif field != "Unknown_Attribute":
+                 value = saveint(line[12])
+                 disk[field] = value
+     return disks
+@@ -84,7 +88,8 @@
+     'Command_Timeout',
+     'End-to-End_Error',
+     'Reported_Uncorrect',
+-    'UDMA_CRC_Error_Count', ]
++    'UDMA_CRC_Error_Count', 
++    'Media_Wearout_Indicator', ]
+ 
+ def inventory_smart_stats(info):
+     disks = parse_smart(info)
+@@ -119,6 +124,7 @@
+                   ('',       'Command_Timeout',         'Command timeouts',     ),
+                   ('',       'End-to-End_Error',        'End-to-End errors',    ),
+                   ('',       'Reported_Uncorrect',      'Uncorrectable errors', ),
++                  ('',       'Media_Wearout_Indicator', 'Media wearout indicator', ),
+                   ('',       'UDMA_CRC_Error_Count',    'UDMA CRC errors',      )]:
+         if field in disk:
+             value = disk[field]
