@@ -1,0 +1,72 @@
+def parse_juniper_if64_vcp(info):
+    parsed = {}
+
+    for x in info:
+        if 'vcp' in x[0]:
+            x[0] = x[0][28:-1]
+            str = re.findall(r'(^.*/\d)-(\w.*$)', x[0])
+            (name,type) = str[0]
+            x[2] = saveint(x[2])
+            if not name in parsed:
+                parsed[name] = {} 
+            if 'bps' in type:
+                speed = float(x[2])
+                raw_type = type[4:]
+                unit = ''
+                if speed > 10**9:
+                    speed /= 10**9
+                    unit = "G" 
+                elif speed > 10**6:
+                    speed /= 10**6
+                    unit = "M"
+                elif speed > 10**3:
+                    speed /= 10**3
+                    unit = "K"
+
+                parsed[name][type] = "%.0f %sbit/s" % (speed, unit)
+                parsed[name][raw_type] = x[2]
+            else:
+                x[2] = get_rate("junf64.vcp.%s.%s" % (name, type), time.time(), x[2])
+                parsed[name][type] = x[2]
+                    
+
+    return parsed
+
+def check_juniper_if64_vcp(item, params, parsed):
+    ok, warn, crit, unknown = range(4)
+
+    if parsed[item]:
+        perfdata = []
+        status = ok
+        infostr = "In: %s, out: %s, error: %d pkt/s" % (parsed[item]['bps-in'], parsed[item]['bps-out'], parsed[item]['crc'])
+        if params["errors"]:
+            errW, errCr = params["errors"]
+            if parsed[item]['crc'] > 0:
+            # rough estimate packet count because of absence such info in switch
+                packet_rate = float(parsed[item]['bytes-in'] + parsed[item]['bytes-out']) / 1500
+                err_rate = parsed[item]['crc'] / packet_rate
+                if err_rate >= errCr:
+                    status = crit
+                    infostr += "(!!)"
+                elif err_rate >= errW:
+                    status = warn
+                    infostr += "(!)"
+            
+            for thing in ('in', 'out', 'crc'):
+                perfdata.append((thing, parsed[item][thing]))
+            
+        return(status, infostr, perfdata)
+    return (unknown, '%s not found' % item, [])
+
+def inventory_juniper_if64_vcp(parsed):
+    return[(x, None) for x in parsed]
+
+check_info["juniper_if64_vcp"] = {
+    'check_function':           check_juniper_if64_vcp,
+    'inventory_function':       inventory_juniper_if64_vcp,
+    'parse_function':           parse_juniper_if64_vcp,
+    'has_perfdata':             True,
+    'service_description':      'Interface %s',
+    'group':                    'if',
+    'default_levels_variable':  'if_default_levels',
+}
