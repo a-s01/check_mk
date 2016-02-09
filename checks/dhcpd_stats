@@ -1,0 +1,51 @@
+dhcpd_stats_levels = (80, 90)
+
+def inventory_dhcpd_stats(info):
+    inventory = []
+
+    for line in info:
+        if line[1] != '0':
+            inventory.append((line[0], dhcpd_stats_levels))
+
+    return inventory
+
+def check_dhcpd_stats(item, params, info):
+    ok, warn, crit, unknown = range(4)
+    infostr = "%s wasn't found in the network lists" % item
+    status = unknown
+    perfdata = []
+    
+    warnlvl, critlvl = params
+
+    for line in info:
+        if item != line[0]:
+            continue
+        
+        total, current = saveint(line[1]), saveint(line[2]);
+        infostr = "Current: %d of %d users" % (current,total)
+        perfdata = [(item, current, (warnlvl * total)/100, (critlvl * total)/100, 0, total)]
+
+        if total != 0:
+            relation = current/total
+        else:
+            break
+
+        if relation >= critlvl:
+            status = crit
+            infostr += ", (!!) more than %d%% usage" % critlvl
+        elif relation >= warnlvl:
+            status = warn
+            infostr += ", (!) more than %d%% usage" % warnlvl
+        else:
+            status = ok
+
+        break
+        
+    return (status, infostr, perfdata)
+        
+check_info["dhcpd_stats"] = {
+    'check_function':   check_dhcpd_stats,
+    'inventory_function':   inventory_dhcpd_stats,
+    'service_description':  "DHCP pool %s",
+    'has_perfdata':         True,
+}
