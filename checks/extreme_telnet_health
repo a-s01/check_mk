@@ -1,10 +1,10 @@
 from time import strftime, localtime
 control_period = 600
 snmpwalk_dir = "/var/lib/check_mk/snmpwalks"
-extreme_conf = "/etc/check_mk/conf.d/extreme-telnet.mk"
-extreme_conf_new = "/etc/check_mk/conf.d/extreme-telnet.mk-new"
-extreme_conf_bkp = "/etc/check_mk/conf.d/.extreme-telnet.mk.bkp"
-extreme_telnet_tags = "snmp|stored_snmp|noPing|virtual|extreme"
+extreme_conf = "/etc/check_mk/conf.d/wato/extreme/extreme-telnet/hosts.mk"
+extreme_conf_new = "/etc/check_mk/conf.d/wato/extreme/extreme-telnet/hosts.mk-new"
+extreme_conf_bkp = "/etc/check_mk/conf.d/wato/extreme/extreme-telnet/.hosts.mk.bkp"
+extreme_telnet_tags = 'lan|site:icinga|snmp|Virtual|extreme-virtual|snmp-only|prod|wato|/" + FOLDER_PATH + "/"'
 
 def check_extreme_telnet_health(item,_no_param,info):
     global g_hostname
@@ -31,25 +31,36 @@ def inventory_extreme_telnet_health(info):
     if os.path.exists(extreme_conf):
         content = []
         f = open(extreme_conf, 'r')
-
+        
+        line_num = 0
         for line in f:
             if telnet_name in line:
                 f.close()
                 return [(None,None)]
 
             if ']' in line:
+                append_here = line_num
                 if line == ']\n':
                     continue
                 else:
                     line = line[:-1]
             content.append(line)
+            line_num = line_num + 1
 
         f.close()
         newF = open(extreme_conf_new, 'w')
-        for line in content:
-            newF.write(line)
+        line_num = 0
+        while (line_num < append_here):
+#        for line in content:
+            newF.write(content[line_num])
+            line_num = line_num + 1
 
         newF.write("\t'%s|%s',\n]" % (telnet_name, extreme_telnet_tags))
+
+        while (line_num < len(content)):
+            newF.write(content[line_num])
+            line_num = line_num + 1
+            
         newF.close()
         
         os.rename(extreme_conf, extreme_conf_bkp)
