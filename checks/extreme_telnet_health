@@ -54,6 +54,12 @@ def inventory_extreme_telnet_health(info):
         
         os.rename(extreme_conf, extreme_conf_bkp)
         os.rename(extreme_conf_new, extreme_conf)
+    else:
+        newF = open(extreme_conf, 'w')
+        newF.write("all_hosts += [")
+        newF.write("\t'%s|%s',\n]" % (telnet_name, extreme_telnet_tags))
+        newF.close()
+        
     return [(None,None)]
 
 check_info["extreme_telnet_health"] = {
