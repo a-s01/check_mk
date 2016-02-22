@@ -1,0 +1,39 @@
+adm_ipstat_default_levels = (90.0, 95.0)
+
+def check_adm_ipstat(item, params, info):
+    warnL, critL = params
+    ok, warn, crit, unknown = range(4)
+    item_status = ok
+
+    for thing, total, busy, allocated, reserved  in info:
+        if thing == item:
+            util = saveint(busy)/float(total) * 100
+            infostr = 'Utilization: %d%%' % util
+            if util >= critL:
+                item_status = crit
+                infostr += '(!!)'
+            elif util >= warnL:
+                item_status = warn
+                infostr += "(!)"
+            infostr += '. Total: %s, busy: %s, allocated: %s, reserved: %s' % (total, busy, allocated, reserved)
+            perfdata = ([   ('usage', util, warnL, critL, 0, 100),
+                                ('total', total),
+                                ('busy', busy),
+                                ('allocated', allocated),
+                                ('reserved', reserved)
+                        ])
+            return (item_status, infostr, perfdata)
+
+    return (unknown, 'UNKNOWN - %s not found' % item, [])
+    
+#def inventory_adm_ipstat(info):
+#    pprint.pprint(info)
+#    return []
+
+check_info["adm_ipstat"] = {
+    'check_function':       check_adm_ipstat,
+    'inventory_function':   lambda info: [(x[0], 'adm_ipstat_default_levels') for x in info],
+#    'inventory_function':   inventory_adm_ipstat, 
+    'service_description':  'IP stat for %s',
+    'has_perfdata':         True,
+}
