@@ -1,0 +1,62 @@
+def parse_socomec_pdu(info):
+    parsed = {}
+
+    i = 0
+    info = info[0]
+    while (i < len(info)):
+        if info[i] == '0':
+            info[i] = 0
+        else:
+            info[i] = float(info[i]) / 10
+        i = i + 1
+    parsed['frequency'] = info[0]
+
+    i = 1
+    while (i <= len(info)/2 ):
+        parsed["line%d" % i] = { 'voltage': info[2*i - 1], 'current': info[2*i] }
+        i = i + 1 
+
+    return parsed
+
+def check_socomec_pdu(item, _no_params, parsed):
+    ok, unknown = (0,3)
+
+    if parsed[item]:
+        if item == 'frequency':
+            return (ok, "%.1fHz" % parsed[item], [('frequency', parsed[item])])
+        else:
+            return (ok, 
+                "voltage: %.1fV, current: %.1fA" % (parsed[item]['voltage'], parsed[item]['current']),
+                 [('voltage', parsed[item]['voltage']), ('current', parsed[item]['current'])])
+    return (unknown, 'info wasn\'t found in SNMP data', [])
+
+def inventory_socomec_pdu(parsed):
+    inventory = []
+   
+    for item in parsed:        
+        if (type(parsed[item]) is dict and 
+            parsed[item]['current'] == parsed[item]['voltage'] == 0):
+            continue
+
+        inventory.append((item, None))
+
+    return inventory
+
+check_info["socomec_pdu"] = { 
+    'check_function':       check_socomec_pdu,
+    'inventory_function':   inventory_socomec_pdu,
+    'parse_function':       parse_socomec_pdu,
+    'service_description':  "%s",
+    'has_perfdata':         True,
+    'snmp_scan_function':   lambda oid: oid(".1.3.6.1.4.1.4555.2.30.2") != None,
+    'snmp_info':            (".1.3.6.1.4.1.4555.2.30.2",
+                                 [  "1.0", #frec
+                                     "2.0", #volt1
+                                     "3.0", #cur1
+                                     "4.0", #2
+                                     "5.0", 
+                                     "6.0",
+                                     "7.0"
+                                ]),
+
+}
