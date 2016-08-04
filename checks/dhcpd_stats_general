@@ -1,0 +1,24 @@
+def inventory_dhcpd_stats_general(info):
+    return [('stats',None)]
+
+def check_dhcpd_stats_general(item, _no_params, info):
+    infostr = 'All values per second: ';
+    perfdata = []
+
+    if not info:
+        return(2, 'No info is present!',perfdata)
+
+    for line in info:
+        thing, value = line
+        value = saveint(value)
+        value = get_rate("dhcpd_stats_general.%s" % thing, time.time(), value)
+        infostr += "%s: %.2f; " % (thing, value)
+        perfdata.append((thing, value))
+    return (0, infostr, perfdata)
+
+check_info["dhcpd_stats_general"] = { 
+    'check_function':   check_dhcpd_stats_general,
+    'inventory_function':   inventory_dhcpd_stats_general,
+    'service_description':  "DHCPd ",
+    'has_perfdata':         True,
+}
