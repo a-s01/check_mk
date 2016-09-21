@@ -1,0 +1,5 @@
+if [[ `ceph -s 2>/dev/null` ]];
+then
+	echo '<<<ceph>>>'
+	ceph -s
+fi

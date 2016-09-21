@@ -1,0 +1,74 @@
+def parse_ceph(info):
+    parsed = {}
+    for line in info:
+        if line[0] == 'cluster':
+            parsed['cluster'] = line[1]
+        elif line[0] == 'health':
+            parsed['health'] = line[1]
+        elif len(line) > 2 and line[2] == 'used,':            
+            parsed['used'] = line[0:2]
+            parsed['avail'] = line[3:-1]
+        elif line[0] == 'client':
+            parsed['io_rd'] = line[2:4]
+            parsed['io_rd'] += line[8:10]
+            parsed['io_wr'] = line[5:7]
+            parsed['io_wr'] += line[11:13]
+        
+    return parsed
+
+def inventory_ceph(parsed):
+    if 'cluster' in parsed:
+        return [(parsed['cluster'], None)]
+    
+def check_ceph(item, _no_params, parsed):
+    ok, warn, crit, unknown = range(4)
+    perfdata = []
+    infostr = ''
+    state = ok
+   
+    if 'health' in parsed:
+        if parsed['health'] == 'HEALTH_OK':
+            infostr = parsed['health'] + "; "
+        else:
+            state = crit
+            infostr = 'health %s' % parsed['health']
+    else:
+        state = unknown
+
+    for thing in ['used', 'avail']:
+        if thing in parsed:
+            infostr += thing + " " + " ".join(parsed[thing]) + '; '
+            if parsed[thing][1] == 'TB':            
+                perfdata.append((thing, saveint(parsed[thing][0])*1000))
+            elif parsed[thing][1] == 'MB':
+                perfdata.append((thing, saveint(parsed[thing][0])/1000))
+            elif parsed[thing][1] == 'KB':                
+                perfdata.append((thing, saveint(parsed[thing][0])/1000000))
+            else:
+                perfdata.append((thing, saveint(parsed[thing][0])))
+
+     
+    for thing in ['io_rd', 'io_wr']:
+        if thing in parsed:
+            infostr += thing + ' ' + " ".join(parsed[thing][0:2]) + ", " + " ".join(parsed[thing][2:]) + "; "
+            if parsed[thing][1] == 'B/s':
+                perfdata.append((thing + '_b/s', saveint(parsed[thing][0])))
+                perfdata.append((thing + '_op/s', saveint(parsed[thing][2])))
+            elif parsed[thing][1] == 'kB/s':
+                perfdata.append((thing + '_b/s', saveint(parsed[thing][0])*1000))
+                perfdata.append((thing + '_op/s',saveint(parsed[thing][2])))
+            elif parsed[thing][1] == 'gB/s':
+                perfdata.append((thing + '_b/s', saveint(parsed[thing][0])*1000*1000))
+                perfdata.append((thing + '_b/s',saveint(parsed[thing][2])))
+        else:
+            state = unknown
+
+    return (state, infostr, perfdata)
+
+check_info['ceph'] = { 
+    "check_function"          : check_ceph,
+    "inventory_function"      : inventory_ceph,
+    "service_description"     : "Cluster %s",
+    "has_perfdata"            : True,
+    "parse_function"           : parse_ceph,
+}
