@@ -1,23 +1,24 @@
-value_names = [ 'cpu', 'temp', 'current', 'transmit power', 'receive power', 'voltage', 'OLT Rx power', 'CATV Rx power']
-value_units = [ '%', "C", "mA", "dBm", "dBm", "V", "dBm", "dBm"]
-precision_table = [ None, None, None, 0.01, 0.01, 0.001, 0.01, 0.01 ]
+value_names = [ 'temp', 'current', 'transmit power', 'receive power', 'voltage', 'OLT Rx power', 'CATV Rx power']
+value_units = [ "C", "mA", "dBm", "dBm", "V", "dBm", "dBm"]
+precision_table = [ None, None, 0.01, 0.01, 0.001, 0.01, 0.01 ]
 
-def check_huawei_olt_optic(item,_no_params,info):
-    info = huawei_olt_parse_info(info)
+def check_huawei_olt_optic(item,_no_params,parsed):
     ok, warn, crit, unknown = range(4)
     status = unknown
     perfdata = []
     infostr = ''
 
-    for port,values in info:
+    for port,values in parsed:
         if port != item:
             continue
 
         status = ok
-
-        for id, value in enumerate(values):
+        for id in range(1,len(values)):
+            value = values[id]
+            id -= 1
             if value == '2147483647':
-                continue
+                infostr = 'offline'
+                break
             if value_names[id] == 'OLT Rx power':
                 value = saveint(value)
                 value -= 10000                      # dirty hack
@@ -30,12 +31,14 @@ def check_huawei_olt_optic(item,_no_params,info):
             if value_names[id] != 'description':
                 perfdata.append(("%s-%s" % (value_names[id],value_units[id]), value))
 
-    if infostr == '': infostr = 'No data was found'
+    if infostr == '': 
+        infostr = 'No data was found'
+        status = unknown
 
     return (status, infostr, perfdata)
 
-def huawei_olt_parse_info(info):
-    optic,ifName,descr,cpu = info
+def parse_huawei_olt_optic(info):
+    optic,ifName,descr = info
     
     ifName = dict(ifName)
 
@@ -43,23 +46,19 @@ def huawei_olt_parse_info(info):
         ifName[id] = ifName[id].replace("GPON", "ONT")
 
     descr = dict(descr)
-    cpu = dict(cpu)
-    pre_inventory = {}
+    parsed = {}
 
-    for index, value in optic:
-        type, port, ontId = index.split('.')
+    for item in optic:
+        port, ontId = item[0].split('.') 
         fullPort = '%s.%s - %s' % (ifName[port],ontId, descr["%s.%s" % (port, ontId)])
-        if not pre_inventory.has_key(fullPort):
-            pre_inventory[fullPort] = [cpu["%s.%s" % (port, ontId)]]
-        pre_inventory[fullPort].append(value)
+        parsed[fullPort] = item[1:]
 
-    return [(name, pre_inventory[name]) for name in pre_inventory]
+    return [(name, parsed[name]) for name in parsed]
 
-def inventory_huawei_olt_optic(info):
-    preInventory = huawei_olt_parse_info(info)
+def inventory_huawei_olt_optic(parsed):
     inventory = []
     
-    for port,values in preInventory:
+    for port,values in parsed:
         count = 0;
         for i in values:
             if i == '2147483647':
@@ -74,22 +73,22 @@ def inventory_huawei_olt_optic(info):
 check_info["huawei_olt_optic"] = {
     'check_function':   check_huawei_olt_optic,
     'inventory_function':   inventory_huawei_olt_optic,
+    'parse_function':   parse_huawei_olt_optic,
     'service_description':  "Sensor info for %s",
     'has_perfdata':         True,
     'snmp_scan_function':   lambda oid: "huawei" in oid(".1.3.6.1.2.1.1.1.0").lower() and \
                                 oid(".1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6.*") != None,
-    'snmp_info':            [   (".1.3.6.1.4.1.2011.6.128.1.1.2.51", [ # optic info
+    'snmp_info':            [   (".1.3.6.1.4.1.2011.6.128.1.1.2.51.1", [ # optic info
                                     OID_END,
-                                    "1",
-#                                    "1", "2", "3", "4", "5", "6",
-#                                    "5", "6",
+                                    "1", "2", "3", "4", "5", "6",
                                 ]),
                                 (".1.3.6.1.2.1.31.1.1.1", [OID_END, "1"]), #ifName
                                 (".1.3.6.1.4.1.2011.6.128.1.1.2.43.1", [
                                     OID_END,
                                     "9", #description
                                 ]),
-                                ( ".1.3.6.1.4.1.2011.6.145.1.1.1.4.1", [OID_END, "3"]), # cpu
+#                                (".1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20", [OID_END]), 
+#                                ( ".1.3.6.1.4.1.2011.6.145.1.1.1.4.1", [OID_END, "3"]), # cpu
                             ],
 }
 
