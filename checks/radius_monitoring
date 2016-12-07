@@ -1,0 +1,16 @@
+radius_default_levels = (None, None)
+
+def check_radius_monitoring(item, params, info):
+    ok, warn, crit, unknown = range(4)
+    status = ok
+    value = float(info[0][0])
+    
+    return (status, "%.4fs" % value, [('reply_time', value)])
+
+check_info["radius_monitoring"] = {
+    'check_function':           check_radius_monitoring,
+    'inventory_function':       lambda info: len(info) > 0 and [(None, radius_default_levels)] or [],
+    'has_perfdata':             True,
+    'service_description':      'Radius reply time',
+    "default_levels_variable":  "radius_default_levels"
+}
