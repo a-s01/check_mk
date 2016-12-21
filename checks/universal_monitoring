@@ -1,0 +1,59 @@
+# parse lines like "name:\s*current_num[\s+warn\s+crit]
+def parse_universal_monitoring(info):
+    infoadd = ''
+
+    i = 0
+    while i < len(info):
+        if info[i][0] == 'INFOADD:':
+            infoadd = info[i][1]
+            del info[i]
+            i = i - 1
+        else:
+            for j in range(len(info[i])):
+                info[i][j] = re.sub('(,|;|:)$', '', info[i][j])
+            info[i][0] += " " + infoadd
+        i += 1
+    return info
+
+def inventory_universal_monitoring(parsed):
+    inventory = []
+
+    for line in parsed:
+        if len(line) > 2:
+            inventory.append((line[0], (line[2],line[3])))
+        else:
+            inventory.append((line[0], None))
+    return inventory
+
+def check_universal_monitoring(item, params, parsed):
+    ok, warn, crit, unknown = range(4)
+    status = ok
+    infostr = ''
+    perfdata = []
+   
+    for line in parsed:
+        if line[0] == item:
+            value = saveint(line[1])
+            infostr += line[1]
+            if len(line) == 4:
+                warn_v = saveint(line[2])
+                crit_v = saveint(line[3])
+                perfdata.append((item, value, warn_v, crit_v))
+                if value >= crit_v:
+                    status = crit
+                    infostr += " (!!) >= %d" % crit
+                elif value >= warn_v:
+                    status = warn
+                    infostr += " (!) >= %d" % warn
+            else:        
+                perfdata.append((item, value))                
+                    
+    return (status, infostr, perfdata)
+
+check_info["universal_monitoring"] = {
+    'parse_function':           parse_universal_monitoring,
+    'check_function':           check_universal_monitoring,
+    'inventory_function':       inventory_universal_monitoring,
+    'has_perfdata':             True,
+    'service_description':      'Monitoring %s',
+}
