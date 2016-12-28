@@ -1,0 +1,77 @@
+# hardcoded units for values
+# "voltage" => "V", "current" => "mA", "tx" => "dBm", "rx" => "dBm", "temp" => "C"
+def parse_jun_optic(info):
+    rename = { 'bias': 'current', 'output': 'tx', 'receiver': 'rx', 'signal': 'rx'}
+    parsed = {}
+    interface = ''
+    item = ''
+
+    for line in info:
+        if line[0] == 'Physical' and line[1] == 'interface:':
+            interface = line[2]
+            parsed[interface] = {}
+            parsed[interface]['module'] = {}
+            item = ''
+        elif not interface:
+            continue
+        elif line[0] == 'Module':
+            if line[2] == ':':
+                if line[1] == 'temperature':
+                    parsed[interface]['module']['temp'] = { 'value': float(line[3]), 'unit': 'C'}
+                elif line[1] == 'voltage':
+                    parsed[interface]['module']['voltage'] = { 'value': float(line[3]), 'unit': 'V'}
+                    
+        elif line[0] == 'Lane':
+            item = "Lane " + line[1]
+            parsed[interface][item] = {}
+        elif len(line) < 4:
+            continue
+        elif any(line[1] == x for x in ('bias', 'output', 'receiver')) and line[3] == ':':
+            if not item:
+                item = 'Lane 0'
+                parsed[interface][item] = {}
+            if line[5] == 'mA':
+                parsed[interface][item][rename[line[1]]] = { 'value': float(line[4]), 'unit': 'mA'}
+            else:
+                parsed[interface][item][rename[line[1]]] = { 'value': float(line[7]), 'unit': line[8]}
+        elif line[1] == 'signal' and line[5] == ':':
+            if not item:
+                item = 'Lane 0'
+                parsed[interface][item] = {}
+            parsed[interface][item][rename[line[1]]] = { 'value': float(line[9]), 'unit': line[10]}
+
+#    pprint.pprint(parsed)
+    return parsed
+
+def inventory_jun_optic(parsed):
+    return [(int, None) for int in parsed if 'Lane 0' in parsed[int]]
+
+def check_jun_optic(item, params, parsed):
+    ok, warn, crit, unknown = range(4)
+    perfdata = []
+    infostr = ''
+
+    if not parsed[item]:
+        return (unknown, 'No info for this interface', [])
+
+#    infostr = '%s: %.2f%s' % (thing, parsed[item][lane][thing]['value'], parsed[item][lane][thing]['unit']) 
+    for thing in parsed[item]['module']:
+        infostr += "%s: %.2f%s; " % (thing, parsed[item]['module'][thing]['value'],parsed[item]['module'][thing]['unit'])
+        perfdata.append((thing, parsed[item]['module'][thing]['value']))
+    for lane in parsed[item]:
+        if lane == 'module':
+            continue
+        infostr += lane + ": "
+        for thing in parsed[item][lane]:
+            infostr += "%s %.2f%s; " % (thing, parsed[item][lane][thing]['value'], parsed[item][lane][thing]['unit'])
+            perfdata.append(("%s-%s" % (lane, thing), parsed[item][lane][thing]['value']))
+            
+    return (ok, infostr, perfdata)
+
+check_info["jun_optic"] = { 
+    'parse_function':           parse_jun_optic,
+    'check_function':           check_jun_optic,
+    'inventory_function':       inventory_jun_optic,
+    'has_perfdata':             True,
+    'service_description':      'Optic info for %s',
+}

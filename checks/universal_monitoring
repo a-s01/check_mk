@@ -9,7 +9,7 @@ def parse_universal_monitoring(info):
             del info[i]
             i = i - 1
         else:
-            for j in range(len(info[i])):
+            for j in xrange(len(info[i])):
                 info[i][j] = re.sub('(,|;|:)$', '', info[i][j])
             info[i][0] += " " + infoadd
         i += 1
