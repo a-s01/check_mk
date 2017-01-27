@@ -21,6 +21,7 @@ $vars = array();
 $colors = array( "8BEA00", "00B25C", "FF4100", "D60062");
 $units = array( "voltage" => "V", "current" => "mA", "tx" => "dBm", "rx" => "dBm", "temp" => "C");
 
+# group together all tx, rx and other values. in one tx,rx can be 4 lanes
 while (isset($DS[$i])) {
     $value_name = '';
     $lane = '';
@@ -37,12 +38,14 @@ while (isset($DS[$i])) {
     $i++;
 }
 
+
 $graph = 0;
+# lets go thought values and draw them
 foreach ($vars as $value_name => $nums) {
     $varNum = 0;
     foreach ($nums as $i) {
         $name = str_replace(array("-","_"), " ", $NAME[$i]);
-        $opt[$graph] = "--vertical-label \"" . $units[$value_name] . "\" --title \"$name: \" -h 140 ";
+        $opt[$graph] = "--vertical-label \"" . $units[$value_name] . "\" --title \"$value_name \" -h 140 ";
         if (! isset($def[$graph])) {
             $def[$graph] = "";
         }
