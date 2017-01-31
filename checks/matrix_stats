@@ -1,0 +1,32 @@
+# to get trunk value be checked add it's name to ./matrix_data to appropriate array position. Position = number of trunk. Gaps fill with None values.
+
+def check_matrix_stats(num, _no_params, info):
+    ok, warn, crit, unknown = range(4)
+    status = unknown
+    perfdata = []
+    infostr = 'Trunk info wasn\'t found'
+
+    names = ["calls", "ended_calls", "ended_with_code" ]
+    num -= 1
+
+    if info[num]:
+        infostr = ''
+        status = ok
+        perfdata = []
+#        if num < len(matrix_names) and matrix_names[num]:
+        infostr = "name: %s; " % matrix_names[num]
+        
+        for i, value in enumerate(info[num]):
+            perfdata.append((names[i], value))
+            infostr += "%s: %s; " % (names[i], value)
+        
+    return (status, infostr, perfdata)
+
+check_info["matrix_stats"] = {
+    'check_function':           check_matrix_stats,
+#    'inventory_function':       inventory_matrix_stats,
+    'inventory_function':       lambda info: [ (i+1, None) for i in range(len(info)) if i <len(matrix_names) and matrix_names[i] is not None ],
+    'has_perfdata':             True,
+    'service_description':      'Trunk %s',
+    'includes':                 [ 'matrix_data' ],
+}
