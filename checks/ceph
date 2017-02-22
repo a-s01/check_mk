@@ -13,7 +13,7 @@ def parse_ceph(info):
             parsed['io_rd'] += line[8:10]
             parsed['io_wr'] = line[5:7]
             parsed['io_wr'] += line[11:13]
-        
+    
     return parsed
 
 def inventory_ceph(parsed):
@@ -26,12 +26,13 @@ def check_ceph(item, _no_params, parsed):
     infostr = ''
     state = ok
    
+    infostr = parsed['health'] + " ; "
     if 'health' in parsed:
-        if parsed['health'] == 'HEALTH_OK':
+        if parsed['health'] == 'HEALTH_WARN':
+            state = warn
             infostr = parsed['health'] + "; "
         else:
             state = crit
-            infostr = 'health %s' % parsed['health']
     else:
         state = unknown
 
@@ -50,16 +51,21 @@ def check_ceph(item, _no_params, parsed):
      
     for thing in ['io_rd', 'io_wr']:
         if thing in parsed:
-            infostr += thing + ' ' + " ".join(parsed[thing][0:2]) + ", " + " ".join(parsed[thing][2:]) + "; "
+            infostr += thing + ' ' + " ".join(parsed[thing][0:2])
+            if len(parsed[thing])>2:            
+                infostr += ", " + " ".join(parsed[thing][2:]) + "; "
             if parsed[thing][1] == 'B/s':
                 perfdata.append((thing + '_b/s', saveint(parsed[thing][0])))
-                perfdata.append((thing + '_op/s', saveint(parsed[thing][2])))
+                if len(parsed[thing])>2:
+                    perfdata.append((thing + '_op/s', saveint(parsed[thing][2])))
             elif parsed[thing][1] == 'kB/s':
                 perfdata.append((thing + '_b/s', saveint(parsed[thing][0])*1000))
-                perfdata.append((thing + '_op/s',saveint(parsed[thing][2])))
+                if len(parsed[thing])>2:
+                    perfdata.append((thing + '_op/s',saveint(parsed[thing][2])))
             elif parsed[thing][1] == 'gB/s':
                 perfdata.append((thing + '_b/s', saveint(parsed[thing][0])*1000*1000))
-                perfdata.append((thing + '_b/s',saveint(parsed[thing][2])))
+                if len(parsed[thing])>2:
+                    perfdata.append((thing + '_b/s',saveint(parsed[thing][2])))
         else:
             state = unknown
 

@@ -1,0 +1,35 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my @attr_to_monitor = ( 233 );
+my @mdstat = `cat /proc/mdstat 2> /dev/null`;
+my $smart_cmd = "smartctl -a";
+
+my @known_devices;
+
+die "Smartctl isn't installed on your system. Bye\n" unless (`which smartctl`);
+
+print "<<<raid_smart>>>\n";
+foreach (@mdstat) {
+    next unless /:.*raid\d*\s(.*)$/; #can be multiple raids with same disks
+    my @devs = split(/\s/,$1);
+    for my $disk (@devs) {
+        $disk = substr($disk,0,3);
+
+        next if (grep {/$disk/} @known_devices); #so we check if disk wasn't checked already
+        push(@known_devices,$disk);
+
+        for my $line (`$smart_cmd /dev/$disk`) {
+            for my $attr (@attr_to_monitor) {
+                if ($line =~ /^$attr\s/) {
+                    my @values = split(/\s+/, $line);
+                    my (undef,$name,undef,$value) = @values;
+                    my $raw_value = pop(@values);
+                    print "$disk $name $value $raw_value\n";
+                }
+            }
+        }
+    }
+}
