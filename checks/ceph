@@ -30,8 +30,8 @@ def check_ceph(item, _no_params, parsed):
     if 'health' in parsed:
         if parsed['health'] == 'HEALTH_WARN':
             state = warn
-            infostr = parsed['health'] + "; "
-        else:
+#            infostr = parsed['health'] + "; "
+        elif parsed['health'] == 'HEALTH_CRIT':
             state = crit
     else:
         state = unknown
