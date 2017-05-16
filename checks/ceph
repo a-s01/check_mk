@@ -30,7 +30,6 @@ def check_ceph(item, _no_params, parsed):
     if 'health' in parsed:
         if parsed['health'] == 'HEALTH_WARN':
             state = warn
-#            infostr = parsed['health'] + "; "
         elif parsed['health'] == 'HEALTH_CRIT':
             state = crit
     else:
@@ -39,35 +38,37 @@ def check_ceph(item, _no_params, parsed):
     for thing in ['used', 'avail']:
         if thing in parsed:
             infostr += thing + " " + " ".join(parsed[thing]) + '; '
-            if parsed[thing][1] == 'TB':            
-                perfdata.append((thing, saveint(parsed[thing][0])*1000))
+            value = saveint(parsed[thing][0])
+
+            if parsed[thing][1] == 'TB':
+                value *= 1000 
             elif parsed[thing][1] == 'MB':
-                perfdata.append((thing, saveint(parsed[thing][0])/1000))
+                value /= 1000
             elif parsed[thing][1] == 'KB':                
-                perfdata.append((thing, saveint(parsed[thing][0])/1000000))
-            else:
-                perfdata.append((thing, saveint(parsed[thing][0])))
+                value /= 1000000
+
+            perfdata.append((thing, value))
 
      
     for thing in ['io_rd', 'io_wr']:
+        value = 0
+        value_ops = 0
+
         if thing in parsed:
             infostr += thing + ' ' + " ".join(parsed[thing][0:2])
+            
+            value = saveint(parsed[thing][0])
+            if parsed[thing][1] == 'kB/s':
+                value *= 1000
+            elif parsed[thing][1] == 'gB/s':
+                value *= 1000*1000
+
             if len(parsed[thing])>2:            
                 infostr += ", " + " ".join(parsed[thing][2:]) + "; "
-            if parsed[thing][1] == 'B/s':
-                perfdata.append((thing + '_b/s', saveint(parsed[thing][0])))
-                if len(parsed[thing])>2:
-                    perfdata.append((thing + '_op/s', saveint(parsed[thing][2])))
-            elif parsed[thing][1] == 'kB/s':
-                perfdata.append((thing + '_b/s', saveint(parsed[thing][0])*1000))
-                if len(parsed[thing])>2:
-                    perfdata.append((thing + '_op/s',saveint(parsed[thing][2])))
-            elif parsed[thing][1] == 'gB/s':
-                perfdata.append((thing + '_b/s', saveint(parsed[thing][0])*1000*1000))
-                if len(parsed[thing])>2:
-                    perfdata.append((thing + '_b/s',saveint(parsed[thing][2])))
-        else:
-            state = unknown
+                value_ops = saveint(parsed[thing][2])
+
+        perfdata.append((thing + '_b/s', value))
+        perfdata.append((thing + '_op/s', value_ops))
 
     return (state, infostr, perfdata)
 
