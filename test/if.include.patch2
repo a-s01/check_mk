@@ -1,8 +1,10 @@
+
+
 --- /root/backup/if.include	2014-08-07 13:31:55.114452001 +0300
 +++ /usr/share/check_mk/checks/if.include	2014-08-07 13:31:21.310452001 +0300
 @@ -37,6 +37,7 @@
  
- factory_settings["if_default_levels"] = {
+factory_settings["if_default_levels"] = {
      "errors" : (0.01, 0.1),
 +    "traffic_excess_period" : (0, 0), #in minutes
  }
