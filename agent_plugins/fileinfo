@@ -1,0 +1,11 @@
+#!/bin/bash
+
+files=(/var/www/html/download/pdu_info.csv)
+
+echo '<<<fileinfo:sep(124)>>>'
+date +%s
+for file in ${files[*]};
+do
+    line=`stat -c '%n|%s|%Y' $file`
+    echo $line
+done
