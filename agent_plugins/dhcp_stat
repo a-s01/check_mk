@@ -1,0 +1,20 @@
+#!/bin/bash
+
+dhcp_conf='/etc/dhcpd.conf';
+info_command_start='/usr/local/bin/dhcpd-pools -l /var/lib/dhcpd/dhcpd.leases'
+
+if [[ -f "$dhcp_conf" ]]; then
+    echo "<<<dhcpd_status>>>";
+    pids=`pidof dhcpd`;
+
+    if [[ -n "$pids" ]]; then
+        echo "0 - OK: dhpd is running";
+        echo "<<<dhcpd_pool_stats>>>";
+        $info_command_start -ft -L 02;
+        $info_command_start -ft -L 04 | sed -e "s/All networks/0SUMMARY/";
+        echo "<<<dhcpd_stats_general>>>";
+        wget -O-  127.0.0.1:8080 -q | sed -n '2,6p' | sed -e "s/^\s*//" | tr -d '":,'
+    else
+        echo "1 - CRIT: dhcpd is not running";
+    fi
+fi

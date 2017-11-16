@@ -14,6 +14,7 @@ rancid_info = { # vendor : { model : (dir, command) }}
     'huawei' : { 'all' : ('huawei-olt', 'hw')},
     'nexus' : { 'all' : ('nexus', 'cisco-nx')},
     'juniper' : { 'all' : ('junipers', 'juniper')},
+    'hp': {'all' : ('hp', 'hp-switch')},
 }
 
 def check_rancid(item, params, info):
@@ -39,10 +40,11 @@ def check_rancid(item, params, info):
             else:
                 status = ok
             
-            infostr += ", last modified: %s" % strftime("%H:%M:%S %d:%m:%Y",localtime(stat.st_mtime))
+            infostr += ", last modified: %s" % strftime("%d.%m.%Y",localtime(stat.st_mtime))
             now = time.time();
             if stat.st_mtime < (now - ttl):
-                infostr += " (!!) < %s" % strftime("%H:%M:%S %d:%m:%Y", localtime(now - ttl))
+                infostr += "(!!)"
+                status = crit
             else:
                 status = max(status,ok)
         else:

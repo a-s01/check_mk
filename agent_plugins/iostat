@@ -1,0 +1,6 @@
+#!/bin/bash
+
+if [ `command -v iostat` ]; then
+    echo '<<<iostat>>>'
+    iostat -x -y 1 1
+fi
