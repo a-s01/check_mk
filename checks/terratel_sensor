@@ -1,0 +1,25 @@
+def inventory_terratel_sensor(info):
+    inventory = []
+
+    for line in info:
+        inventory.append((line[0], None))
+
+    return inventory
+
+def check_terratel_sensor(item, _no_params, info):
+    ok, warn, crit, unknown = range(4)
+
+    for line in info:
+        if line[0] != item:
+            continue
+        return (ok, '%s degrees' % line[1], [("Sensor%s temperature degrees" % item, line[1])]) 
+    return (unknown, 'item wasn\'t found in snmp output', [("Sensor%s temperature degrees" % item, NULL)])
+
+check_info['terratel_sensor'] = {
+    'check_function':       check_terratel_sensor,
+    'inventory_function':   inventory_terratel_sensor,
+    'service_description':  'Sensor%s info',
+    'has_perfdata':         True,
+    'snmp_scan_function':   lambda oid: oid(".1.3.6.1.4.1.33199.5.8.1.1.2.*") != None,
+    'snmp_info':            (".1.3.6.1.4.1.33199.5.8.1.1", [ OID_END, 2]),
+}

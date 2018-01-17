@@ -1,3 +1,8 @@
+# NOTES
+# number of line is count automaticly
+#.1.3.6.1.4.1.4555.2.30.2.2-3 is line1
+#.1.3.6.1.4.1.4555.2.30.2.4-5 is line2 and so on
+
 factory_settings['socomec_pdu_default'] = { 'summary': (22.5, 25)  } #warn, crit
 
 def parse_socomec_pdu(info):
@@ -67,8 +72,8 @@ check_info["socomec_pdu"] = {
                                  [  "1.0", #frec
                                      "2.0", #volt1
                                      "3.0", #cur1
-                                     "4.0", #2
-                                     "5.0", 
+                                     "4.0", #volt2
+                                     "5.0", #cur2
                                      "6.0",
                                      "7.0"
                                 ]),
