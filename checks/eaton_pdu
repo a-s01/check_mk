@@ -1,0 +1,103 @@
+factory_settings['eaton_pdu_default'] = { 'current': (22.5, 25),  #warn, crit. Empirical value for 32A pdu
+                                            'status': (2, 1),    #warn doesn' exits. It's a trick, status can be only 0 (ok), and 1 (failure)
+}
+
+eaton_pdu_scale_units = [ ('frequency', 0.1, 'Hz'),
+                          ('voltage', 0.001, 'V'), #'voltage'
+                          ('current', 0.001, 'A'), #'current'
+                          ('power', 1,'Watts'),    #'power'
+                          ('power2', 1,'Watts'),   #'power'
+                          ('status', 1,''),    #'power'
+]
+
+def parse_eaton_pdu(info):
+    parsed = {'summary': { 'value': 0, 'units': 'Watts'} }
+    
+    i = 0
+    for num in info[0]:
+        name, scale, unit = eaton_pdu_scale_units[i]
+        parsed[name] = {'value': savefloat(num) * scale, 'units': unit}
+
+        if name == 'power' or name == 'power2':
+            parsed['summary']['value'] += parsed[name]['value'] #power summary
+
+        i = i +1        
+
+    return parsed
+
+def inventory_eaton_pdu(parsed):
+    inventory = []
+
+    if parsed['status']:
+        inventory.append(('Internal status',factory_settings['eaton_pdu_default']))
+
+    if parsed['power']:
+        inventory.append(('Power', factory_settings['eaton_pdu_default']))
+
+    if parsed:
+        inventory.append(('Line info', factory_settings['eaton_pdu_default']))
+
+    return inventory
+    
+def check_eaton_pdu(item, params, parsed):
+    ok, warn, crit, unknown = range(4)
+    status = ok
+    infostr = ''
+    perfdata = []
+   
+    key_groups = {  'Line info': ('current', 'frequency', 'voltage'), 
+                    'Power': ('summary', 'power', 'power2'),
+                    'Internal status': ('status', ),
+    }
+
+    if item in key_groups:
+        for key in key_groups[item]:
+            if key in parsed:
+                value = parsed[key]['value']  
+                if key == 'status':
+                    if value: 
+                        infostr = 'internal failure'
+                    else:
+                        infostr = 'ok'
+                else:
+                    infostr += "%s: %.2f%s; " % (key, value, parsed[key]['units'])
+                    perfdata.append((key, value))
+
+                if params and key in params:
+                    warn_value, crit_value = params[key]
+                    if value >= crit_value:
+                        infostr += " (!!) >= %.2f" % crit_value
+                        status = crit
+                    elif value >= warn_value:
+                        infostr += " (!) >= %.2f" % warn_value
+                        status = warn
+            else:
+                status = unknown
+                infostr += "%s wasn't found in snmp info; " % key
+    else:
+        infostr = "Internal check error"
+
+    if not infostr:
+        infostr = 'No info was found'
+        status = unknown
+
+    return (status, infostr, perfdata)
+
+check_info["eaton_pdu"] = { 
+    'check_function':       check_eaton_pdu,
+    'inventory_function':   inventory_eaton_pdu,
+    'parse_function':       parse_eaton_pdu,
+    'service_description':  "%s",
+    'has_perfdata':         True,
+    'default_levels_variable': "eaton_pdu_default", 
+    'snmp_scan_function':   lambda oid: oid(".1.3.6.1.2.1.1.2.0") == '.1.3.6.1.4.1.534.6.6.7',
+    'snmp_info':            (".1.3.6.1.4.1.534.6.6.7",
+                                [
+                                    "3.1.1.3.0.1", #frequency
+                                    "3.2.1.3.0.1.1", #voltage
+                                    "3.3.1.4.0.1.1", #current
+                                    "3.4.1.4.0.1.1", #power
+                                    "3.4.1.4.0.1.2", #power2
+                                    "1.2.1.31.0", #status
+                                ]),
+}
