@@ -41,13 +41,13 @@ def check_ceph(item, _no_params, parsed):
             value = saveint(parsed[thing][0])
 
             if parsed[thing][1] == 'TB':
-                value *= 1000 
+                value *= 1000
             elif parsed[thing][1] == 'MB':
                 value /= 1000
-            elif parsed[thing][1] == 'KB':                
+            elif parsed[thing][1] == 'KB':
                 value /= 1000000
 
-            perfdata.append((thing, value))
+            perfdata.append((thing, value)) #values in GB
 
      
     for thing in ['io_rd', 'io_wr']:
@@ -60,8 +60,10 @@ def check_ceph(item, _no_params, parsed):
             value = saveint(parsed[thing][0])
             if parsed[thing][1] == 'kB/s':
                 value *= 1000
-            elif parsed[thing][1] == 'gB/s':
+            elif parsed[thing][1] == 'MB/s':
                 value *= 1000*1000
+            elif parsed[thing][1] == 'gB/s':
+                value *= 1000*1000*1000
 
             if len(parsed[thing])>2:            
                 infostr += ", " + " ".join(parsed[thing][2:]) + "; "
