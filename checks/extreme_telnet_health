@@ -1,3 +1,5 @@
+import pwd
+import grp
 from time import strftime, localtime
 control_period = 600
 snmpwalk_dir = "/var/lib/check_mk/snmpwalks"
@@ -31,6 +33,7 @@ def inventory_extreme_telnet_health(info):
     if os.path.exists(extreme_conf):
         content = []
         f = open(extreme_conf, 'r')
+        append_here = ''
         
         line_num = 0
         for line in f:
@@ -38,7 +41,7 @@ def inventory_extreme_telnet_health(info):
                 f.close()
                 return [(None,None)]
 
-            if ']' in line:
+            if ']' in line and not append_here:
                 append_here = line_num
                 if line == ']\n':
                     continue
@@ -55,7 +58,7 @@ def inventory_extreme_telnet_health(info):
             newF.write(content[line_num])
             line_num = line_num + 1
 
-        newF.write("\t'%s|%s',\n]" % (telnet_name, extreme_telnet_tags))
+        newF.write("\t\"%s|%s,\n]" % (telnet_name, extreme_telnet_tags))
 
         while (line_num < len(content)):
             newF.write(content[line_num])
@@ -71,6 +74,9 @@ def inventory_extreme_telnet_health(info):
         newF.write("\t'%s|%s',\n]" % (telnet_name, extreme_telnet_tags))
         newF.close()
         
+    uid = pwd.getpwnam("www-data").pw_uid
+    gid = grp.getgrnam("nagios").gr_gid
+    os.chown(extreme_conf, uid, gid)
     return [(None,None)]
 
 check_info["extreme_telnet_health"] = {
