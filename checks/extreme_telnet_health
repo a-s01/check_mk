@@ -58,7 +58,7 @@ def inventory_extreme_telnet_health(info):
             newF.write(content[line_num])
             line_num = line_num + 1
 
-        newF.write("\t\"%s|%s,\n]" % (telnet_name, extreme_telnet_tags))
+        newF.write("\t\"%s|%s,\n]\n" % (telnet_name, extreme_telnet_tags))
 
         while (line_num < len(content)):
             newF.write(content[line_num])
